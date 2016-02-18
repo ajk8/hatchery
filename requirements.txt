@@ -1,0 +1,5 @@
+-e .
+
+# testing requirements
+pytest
+pytest-cov
