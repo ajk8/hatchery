@@ -1,57 +1,141 @@
-import click
+"""
+hatchery (version {version})
+
+Automate the process of testing, packaging, and uploading your project with
+dynamic versioning and no source tree pollution!
+
+Usage: hatchery [<task> ...] [options]
+
+Just run from the root of your project and off you go.  Tasks can be
+chained, and will always be run in the order below regardless of the order
+in which they are specified.  Available tasks are:
+
+    help        print this help output (ignores all other tasks)
+    check       check to see if this project conforms to hatchery requirements
+    clean       clean up the working directory
+    test        run tests according to commands specified in .hatchery.yml
+    package     create binary packages to be distributed
+    register    register your package with the index if you haven't already
+    upload      upload all created packages to a configured pypi index
+
+General options:
+
+    -h, --help      print this help output and quit
+    --log-level=LEVEL
+                    one of (debug, info, error, critical) [default: info]
+    -r=VER, --release-version=VER
+                    version to use when packaging (registering and uploading)
+
+Packaging options:
+
+    --no-wheel      don't bother creating a wheel
+"""
+
+import docopt
 import logbook
 import funcy
+import os
 from . import _version
 from . import workdir
 from . import executor
 from . import project
 from . import config
+from . import snippets
 
 logger = logbook.Logger(__name__)
 
 
-@click.group(chain=True, no_args_is_help=True)
-@click.version_option(version=_version.__version__)
-def hatchery(**kwargs):
-    logbook.StderrHandler().push_application()
+def _get_package_name_or_die():
+    try:
+        package_name = project.get_package_name()
+    except project.PackageError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
+    return package_name
 
 
-@hatchery.command()
-@click.option('--release-version', '-r', type=str)
-@click.option('--allow-invalid-version', is_flag=True)
-@click.option('--no-wheel', is_flag=True)
-def package(release_version, allow_invalid_version, no_wheel):
+def _get_config_or_die():
+    try:
+        config_dict = config.from_yaml()
+    except config.ConfigError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
+    return config_dict
+
+
+def _valid_version_or_die(release_version):
+    if not project.version_is_valid(release_version):
+        logger.error('version "{}" is not pip-compatible, try another!'.format(release_version))
+        raise SystemExit(1)
+
+
+def _check_and_set_version(release_version, package_name):
+    set_flag = True
+    if not release_version:
+        set_flag = False
+        release_version = project.get_version(package_name)
+    _valid_version_or_die(release_version)
+    if set_flag:
+        project.set_version(package_name, release_version)
+    return release_version
+
+
+def task_upload(args):
     workdir.sync()
     with workdir.as_cwd():
-        try:
-            package_name = project.get_package_name()
-        except project.PackageError as e:
-            logger.error(str(e))
+        config_dict = _get_config_or_die()
+        pypi_repository = config_dict['pypi_repository']
+        pypirc_dict = config.from_pypirc(pypi_repository)
+        index_url = pypirc_dict['repository']
+        project_name = project.get_project_name()
+        package_name = _get_package_name_or_die()
+        release_version = project.get_version(package_name)
+        _valid_version_or_die(release_version)
+        if project.version_already_uploaded(project_name, release_version, index_url):
+            logger.error('version {} already exists in index {}'.format(
+                release_version, index_url
+            ))
             raise SystemExit(1)
-        if release_version:
-            if not project.version_is_valid(release_version) and not allow_invalid_version:
-                logger.error(
-                    'version {} is not pip-compatible, try another!'.format(release_version)
-                )
-                raise SystemExit(1)
-            project.set_version(package_name, release_version)
+        result = executor.call('twine', 'upload', '-r', pypi_repository, 'dist/*')
+        if result.exitval and 'not allowed to edit' in result.stderr:
+            logger.error('could not upload packages, try `hatchery register`')
+            raise SystemExit(1)
+
+
+def task_register(args):
+    release_version = args['--release-version']
+    workdir.sync()
+    with workdir.as_cwd():
+        config_dict = _get_config_or_die()
+        pypi_repository = config_dict['pypi_repository']
+        package_name = _get_package_name_or_die()
+        _check_and_set_version(release_version, package_name)
+        result = executor.setup('register', '-r', pypi_repository)
+        if result.exitval or '(400)' in result.stdout:
+            logger.error('failed to register project')
+            raise SystemExit(result.exitval)
+
+
+def task_package(args):
+    release_version = args['--release-version']
+    no_wheel = args['--no-wheel']
+    workdir.sync()
+    with workdir.as_cwd():
+        package_name = _get_package_name_or_die()
+        _check_and_set_version(release_version, package_name)
         setup_args = ['sdist']
         if not no_wheel:
             setup_args.append('bdist_wheel')
-        exitval = executor.setup(*setup_args)
-        if exitval:
-            raise SystemExit(exitval)
+        result = executor.setup(*setup_args)
+        if result.exitval:
+            logger.error('failed to package project')
+            raise SystemExit(result.exitval)
 
 
-@hatchery.command()
-def test():
+def task_test(args):
     workdir.sync()
     with workdir.as_cwd():
-        try:
-            config_dict = config.from_yaml()
-        except config.ConfigError as e:
-            logger.error(e)
-            raise SystemExit(1)
+        config_dict = _get_config_or_die()
         if not config_dict['test_command']:
             logger.error('no test command found in config!')
             raise SystemExit(1)
@@ -59,11 +143,85 @@ def test():
         if not funcy.is_list(test_commands):
             test_commands = [test_commands]
         for cmd_str in test_commands:
-            exitval = executor.call_str(cmd_str)
-            if exitval:
-                raise SystemExit(exitval)
+            result = executor.call(cmd_str)
+            if result.exitval:
+                raise SystemExit(result.exitval)
 
 
-@hatchery.command()
-def clean():
+def task_clean(args):
     workdir.remove()
+
+
+def task_check(args):
+    logger.info('checking project for requirements')
+    ret = 0
+    logger.debug('verifying that project has a single package')
+    package_name = project.get_package_name()
+    logger.debug('checking state of {} file'.format(project.VERSION_FILE_NAME))
+    if not project.package_has_version_file(package_name):
+        logger.error('package does not have a {} file'.format(project.VERSION_FILE_NAME))
+        ret = 1
+    elif not project.version_file_has___version__(package_name):
+        logger.error('package has a {} file but does not define a __version__ variable'.format(
+            project.VERSION_FILE_NAME
+        ))
+        ret = 1
+    logger.debug('checking state of setup.py')
+    if not project.setup_py_has_exec_block(package_name):
+        setup_py_block = snippets.get_snippet_content('setup.py')
+        logger.error('setup.py must have the following block: ' + os.linesep + setup_py_block)
+        ret = 1
+    if not project.setup_py_uses___version__():
+        logger.error(
+            'setup.py must use the __version__ variable imported by the exec block' + os.linesep +
+            'setup(' + os.linesep +
+            '    ...' + os.linesep +
+            '    version=__version__,' + os.linesep +
+            '    ...' + os.linesep +
+            ')')
+        ret = 1
+    if ret:
+        raise SystemExit(ret)
+    else:
+        logger.info('everything looks good!')
+
+
+def _all_tasks():
+    ret = {}
+    prefix = 'task_'
+    for name, func in globals().items():
+        if name.startswith(prefix):
+            ret[name.replace(prefix, '')] = func
+    return ret
+
+
+def hatchery():
+    """ Main entry point for the hatchery program """
+    args = docopt.docopt(__doc__)
+    task_list = args['<task>']
+
+    if not task_list or 'help' in task_list or args['--help']:
+        print(__doc__.format(version=_version.__version__))
+        return 0
+
+    level_str = args['--log-level']
+    try:
+        level_const = logbook.lookup_level(level_str.upper())
+        logbook.StderrHandler(level=level_const).push_application()
+    except LookupError:
+        logbook.StderrHandler().push_application()
+        logger.error('received invalid log level: ' + level_str)
+        return 1
+
+    all_tasks = _all_tasks()
+
+    for task in task_list:
+        if task not in all_tasks.keys():
+            logger.error('received invalid task: ' + task)
+            return 1
+
+    # all commands will raise a SystemExit if they fail
+    for task, func in all_tasks.items():
+        if task in task_list:
+            func(args)
+    return 0

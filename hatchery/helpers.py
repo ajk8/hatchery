@@ -52,13 +52,20 @@ def package_file_path(filename, package_name):
     return os.path.join(package_name, filename)
 
 
-def regex_in_file(regex, filepath):
-    """ Search for a regex in a file """
+def regex_in_file(regex, filepath, return_match=False):
+    """ Search for a regex in a file
+
+    If return_match is True, return the found object instead of a boolean
+    """
     file_content = get_file_content(filepath)
-    return funcy.re_test(regex, file_content)
+    re_method = funcy.re_find if return_match else funcy.re_test
+    return re_method(regex, file_content)
 
 
-def regex_in_package_file(regex, filename, package_name):
-    """ Search for a regex in a file contained within the package directory """
+def regex_in_package_file(regex, filename, package_name, return_match=False):
+    """ Search for a regex in a file contained within the package directory
+
+    If return_match is True, return the found object instead of a boolean
+    """
     filepath = package_file_path(filename, package_name)
-    return regex_in_file(regex, filepath)
+    return regex_in_file(regex, filepath, return_match=return_match)

@@ -1,9 +1,15 @@
 import pytest
 import os
 import funcy
+import pip
 from hatchery import project
 from hatchery import snippets
 from hatchery import helpers
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 PACKAGE_NAME = 'mypackage'
 
@@ -102,14 +108,33 @@ def test_package_uses___version__(tmpdir):
         assert project.package_uses___version__(PACKAGE_NAME)
 
 
-def test_set_version(tmpdir):
+def test_get_project_name(tmpdir):
     with tmpdir.as_cwd():
         with pytest.raises(IOError):
-            project.set_version(PACKAGE_NAME, '1.2.3')
+            project.get_project_name()
+        with open('setup.py', 'w') as setup_py:
+            setup_py.write('setup(name="someproject")')
+        assert project.get_project_name() == 'someproject'
+
+
+def test_get_version(tmpdir):
+    with tmpdir.as_cwd():
+        with pytest.raises(IOError):
+            project.get_version(PACKAGE_NAME)
         version_file = helpers.package_file_path(project.VERSION_FILE_NAME, PACKAGE_NAME)
         _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(version_file)])
         with pytest.raises(project.ProjectError):
-            project.set_version(PACKAGE_NAME, '1.2.3')
+            project.get_version(PACKAGE_NAME)
+        snippet_content = snippets.get_snippet_content(project.VERSION_FILE_NAME)
+        with open(version_file, 'w') as _version_py:
+            _version_py.write(snippet_content)
+        assert project.get_version(PACKAGE_NAME) == 'managed by hatchery'
+
+
+def test_set_version(tmpdir):
+    with tmpdir.as_cwd():
+        version_file = helpers.package_file_path(project.VERSION_FILE_NAME, PACKAGE_NAME)
+        _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(version_file)])
         snippet_content = snippets.get_snippet_content(project.VERSION_FILE_NAME)
         with open(version_file, 'w') as _version_py:
             _version_py.write(snippet_content)
@@ -117,3 +142,19 @@ def test_set_version(tmpdir):
         version_file_content = helpers.get_file_content(version_file)
         found = funcy.re_find(project.VERSION_SET_REGEX, version_file_content)
         assert found['version'] == '1.2.3'
+
+
+def test_version_already_uploaded_true():
+
+    def _mock_findreq_found(self, req, upgrade):
+        return True
+
+    def _mock_findreq_notfound(self, req, upgrade):
+        raise pip.exceptions.DistributionNotFound("you've been mocked!")
+
+    with mock.patch('pip.index.PackageFinder.find_requirement', _mock_findreq_found):
+        ret = project.version_already_uploaded('someprj', '1.2.3', 'https://pypi.python.org/pypi')
+        assert ret is True
+    with mock.patch('pip.index.PackageFinder.find_requirement', _mock_findreq_notfound):
+        ret = project.version_already_uploaded('someprj', '1.2.3', 'https://pypi.python.org/pypi')
+        assert ret is False

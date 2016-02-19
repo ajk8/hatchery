@@ -20,14 +20,14 @@ setup(
     install_requires=[
         'funcy==1.6',
         'dirsync==2.1',
-        'click==6.2',
+        'docopt==0.6.2',
         'six==1.10.0',
         'wheel==0.26.0',
         'pyyaml==3.11',
         'logbook==0.12.5'
     ],
     classifiers=[
-        'Development Status :: 5 - Alpha',
+        'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.6',

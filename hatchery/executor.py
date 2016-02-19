@@ -2,42 +2,52 @@ import subprocess
 import sys
 import shlex
 import logbook
+import collections
+import funcy
 
 logger = logbook.Logger(__name__)
 
 
-def call(*args):
-    """ Call an arbitary command and return the exit value
+CallResult = collections.namedtuple('CallResult', ('exitval', 'stdout', 'stderr'))
 
-    >>> call('hatchery')
-    0
-    >>> call('hatchery', 'notreal')
-    2
+
+def call(cmd_args, suppress_output=False):
+    """ Call an arbitary command and return the exit value, stdout, and stderr as a tuple
+
+    Command can be passed in as either a string or iterable
+
+    >>> call('hatchery', suppress_output=True)  # doctest: +ELLIPSIS
+    CallResult(exitval=0, ...)
+    >>> call(['hatchery', 'notreal'])  # doctest: +ELLIPSIS
+    CallResult(exitval=1, ...)
     """
-    logger.info('executing `{}`'.format(' '.join(args)))
-    retval = subprocess.call(args)
-    if retval:
-        logger.error('`{}` returned error code {}'.format(' '.join(args), retval))
-    return retval
+    if not funcy.is_list(cmd_args) and not funcy.is_tuple(cmd_args):
+        cmd_args = shlex.split(cmd_args)
+    logger.info('executing `{}`'.format(' '.join(cmd_args)))
+    out = err = ''
+    p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    while p.returncode is None:
+        _out, _err = p.communicate()
+        _out, _err = _out.decode(), _err.decode()
+        if not suppress_output:
+            sys.stdout.write(_out)
+            sys.stderr.write(_err)
+        out += _out
+        err += _err
+    if p.returncode:
+        logger.error('`{}` returned error code {}'.format(' '.join(cmd_args), p.returncode))
+    return CallResult(p.returncode, out, err)
 
 
-def call_str(cmd_str):
-    """ Call an arbitrary command with a string instead of *args
-
-    >>> call_str('hatchery notreal')
-    2
-    """
-    cmd_args = shlex.split(cmd_str)
-    return call(*cmd_args)
-
-
-def setup(*args):
+def setup(cmd_args, suppress_output=False):
     """ Call a setup.py command or list of commands
 
-    >>> setup('--name')
-    0
-    >>> setup('notreal')
-    1
+    >>> setup('--name', suppress_output=True)  # doctest: +ELLIPSIS
+    CallResult(exitval=0, ...)
+    >>> setup('notreal')  # doctest: +ELLIPSIS
+    CallResult(exitval=1, ...)
     """
-    cmd_args = [sys.executable, 'setup.py'] + [x for x in args]
-    return call(*cmd_args)
+    if not funcy.is_list(cmd_args) and not funcy.is_tuple(cmd_args):
+        cmd_args = shlex.split(cmd_args)
+    cmd_args = [sys.executable, 'setup.py'] + [x for x in cmd_args]
+    return call(cmd_args, suppress_output=suppress_output)

@@ -1,11 +1,9 @@
 import os
 import pytest
-import funcy
 from hatchery import config
 
 
-def test_from_yaml(tmpdir, monkeypatch):
-    monkeypatch.setattr(funcy, 'memoize', lambda: 0)
+def test_from_yaml(tmpdir):
     with tmpdir.as_cwd():
         config_dict = config.from_yaml(_rebuild_cache_for_testing=True)
         assert config_dict['test_command'] is None
@@ -22,3 +20,19 @@ def test_from_yaml(tmpdir, monkeypatch):
             config.from_yaml(_rebuild_cache_for_testing=True)
 
 
+PYPIRC_DATA = '''
+[pypi]
+repository: https://pypi.python.org/pypi
+username: someuser
+password: somepass
+'''
+
+
+def test_from_pypirc(tmpdir):
+    with tmpdir.as_cwd():
+        with open('.pypirc', 'w') as pypirc_file:
+            pypirc_file.write(PYPIRC_DATA)
+        pypirc_config = config.from_pypirc('notthere', _pypirc_location_for_testing='.pypirc')
+        assert pypirc_config == {}
+        pypirc_config = config.from_pypirc('pypi', _pypirc_location_for_testing='.pypirc')
+        assert pypirc_config['username'] == 'someuser'

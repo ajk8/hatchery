@@ -1,6 +1,7 @@
 import setuptools
 import funcy
 import os
+import pip
 from pkg_resources.extern import packaging
 from . import snippets
 from . import helpers
@@ -69,14 +70,32 @@ def package_uses___version__(package_name):
     return helpers.regex_in_package_file(r'import.*__version__', '__init__.py', package_name)
 
 
-def set_version(package_name, version_str):
-    """ Set the version in _version.py to version_str """
+def get_project_name():
+    """ Grab the project name out of setup.py """
+    setup_py_content = helpers.get_file_content('setup.py')
+    ret = helpers.value_of_named_argument_in_function('name', 'setup', setup_py_content)
+    if ret and ret[0] == ret[-1] in ('"', "'"):
+        ret = ret[1:-1]
+    return ret
+
+
+def get_version(package_name):
+    """ Get the version which is currently configured by the package """
+    found = helpers.regex_in_package_file(VERSION_SET_REGEX, VERSION_FILE_NAME, package_name)
     version_file_path = helpers.package_file_path(VERSION_FILE_NAME, package_name)
     version_file_content = helpers.get_file_content(version_file_path)
     found = funcy.re_find(VERSION_SET_REGEX, version_file_content)
     if found is None:
         raise ProjectError('found {}, but __version__ is not defined')
     current_version = found['version']
+    return current_version
+
+
+def set_version(package_name, version_str):
+    """ Set the version in _version.py to version_str """
+    current_version = get_version(package_name)
+    version_file_path = helpers.package_file_path(VERSION_FILE_NAME, package_name)
+    version_file_content = helpers.get_file_content(version_file_path)
     version_file_content = version_file_content.replace(current_version, version_str)
     with open(version_file_path, 'w') as version_file:
         version_file.write(version_file_content)
@@ -93,5 +112,20 @@ def version_is_valid(version_str):
     try:
         packaging.version.Version(version_str)
     except packaging.version.InvalidVersion:
+        return False
+    return True
+
+
+def version_already_uploaded(project_name, version_str, index_url):
+    """ Check to see if the version specified has already been uploaded to the configured index
+    """
+
+    pf = pip.index.PackageFinder([], [index_url], session=pip.download.PipSession())
+    try:
+        req = pip.req.InstallRequirement(
+            '{}=={}'.format(project_name, version_str), comes_from=None
+        )
+        pf.find_requirement(req, upgrade=False)
+    except (pip.exceptions.DistributionNotFound, pip.exceptions.InstallationError):
         return False
     return True

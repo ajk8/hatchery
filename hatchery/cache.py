@@ -45,3 +45,44 @@ def has(k):
     True
     """
     return k in _CACHE.keys()
+
+
+def me(k=None):
+    """ Use the cache as a decorator, essentially memoize with an override
+
+    >>> from . import cache
+    >>> @cache.me()
+    ... def dummy():
+    ...     return 'value'
+    ...
+    >>> dummy()
+    'value'
+    >>> cache.get('dummy(){}')
+    'value'
+    >>> @cache.me('smarty')
+    ... def dummy():
+    ...     return 'value'
+    ...
+    >>> dummy()
+    'value'
+    >>> cache.get('smarty(){}')
+    'value'
+    """
+
+    def me_decorator(func):
+
+        _k = k if k else func.__name__
+
+        def func_wrapper(*args, **kwargs):
+            __k = _k + str(args) + str(kwargs)
+            if not has(__k) or (
+                '_rebuild_cache_for_testing' in kwargs.keys() and
+                kwargs['_rebuild_cache_for_testing']
+            ):
+                v = func(*args, **kwargs)
+                upsert(__k, v)
+            return get(__k)
+
+        return func_wrapper
+
+    return me_decorator
