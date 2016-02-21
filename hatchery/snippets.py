@@ -1,4 +1,5 @@
 import os
+from . import helpers
 
 SNIPPETS_ROOT = os.path.join(os.path.dirname(__file__), 'snippets')
 
@@ -9,8 +10,7 @@ def get_snippet_content(snippet_name, **format_kwargs):
     snippet_file = os.path.join(SNIPPETS_ROOT, filename)
     if not os.path.isfile(snippet_file):
         raise ValueError('could not find snippet with name ' + filename)
-    with open(snippet_file) as sf:
-        ret = sf.read()
+    ret = helpers.get_file_content(snippet_file)
     if format_kwargs:
         ret = ret.format(**format_kwargs)
     return ret

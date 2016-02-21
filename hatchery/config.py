@@ -1,7 +1,7 @@
 import yaml
 import os
 import copy
-from . import cache
+import microcache
 
 try:
     import ConfigParser as configparser
@@ -9,9 +9,10 @@ except ImportError:
     import configparser
 
 PYPIRC_LOCATIONS = ['~/.pypirc']
-CONFIG_LOCATIONS = ['~/.hatchery/hatcher.yml', '.hatchery.yml']
+CONFIG_LOCATIONS = ['~/.hatchery/hatchery.yml', '.hatchery.yml']
 DEFAULT_CONFIG = {
     'pypi_repository': None,
+    'readme_to_rst': None,
     'test_command': None
 }
 
@@ -20,8 +21,8 @@ class ConfigError(RuntimeError):
     pass
 
 
-@cache.me()
-def from_yaml(_rebuild_cache_for_testing=False):
+@microcache.this
+def from_yaml():
     """ Load configuration from yaml source(s), cached to only run once """
     ret = copy.deepcopy(DEFAULT_CONFIG)
     for k, v in DEFAULT_CONFIG.items():
@@ -42,9 +43,8 @@ def from_yaml(_rebuild_cache_for_testing=False):
     return ret
 
 
-@cache.me()
-def from_pypirc(pypi_repository, _pypirc_location_for_testing=None,
-                _rebuild_cache_for_testing=False):
+@microcache.this
+def from_pypirc(pypi_repository, _pypirc_location_for_testing=None):
     """ Load configuration from .pypirc file, cached to only run once """
     ret = {}
     if _pypirc_location_for_testing is not None:

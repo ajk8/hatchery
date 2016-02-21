@@ -10,6 +10,7 @@ WORKDIR_EXCLUDES = [
     r'^\{}'.format(WORKDIR),
     r'^\.cache',
     r'^\.coverage',
+    r'^\.git',
     r'^.*\.egg-info',
     r'^.*__pycache__',
     r'^.*\.pyc'

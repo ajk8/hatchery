@@ -2,11 +2,13 @@ import tokenize
 import collections
 import os
 import funcy
+import microcache
 from io import StringIO
 
 SimplifiedToken = collections.namedtuple('SimplifiedToken', ('typenum', 'value'))
 
 
+@microcache.this
 def value_of_named_argument_in_function(argument_name, function_name, search_str):
     """ Parse an arbitrary block of python code to get the value of a named argument
         from inside a function call
@@ -36,6 +38,7 @@ def value_of_named_argument_in_function(argument_name, function_name, search_str
     return None
 
 
+@microcache.this
 def get_file_content(file_path):
     """ Load the content of a text file into a string """
     with open(file_path) as f:
@@ -43,6 +46,7 @@ def get_file_content(file_path):
     return ret
 
 
+@microcache.this
 def package_file_path(filename, package_name):
     """ Convenience function to get the path to a package's version file
 
@@ -52,6 +56,7 @@ def package_file_path(filename, package_name):
     return os.path.join(package_name, filename)
 
 
+@microcache.this
 def regex_in_file(regex, filepath, return_match=False):
     """ Search for a regex in a file
 
@@ -62,6 +67,7 @@ def regex_in_file(regex, filepath, return_match=False):
     return re_method(regex, file_content)
 
 
+@microcache.this
 def regex_in_package_file(regex, filename, package_name, return_match=False):
     """ Search for a regex in a file contained within the package directory
 

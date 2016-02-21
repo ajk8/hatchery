@@ -24,7 +24,10 @@ setup(
         'six==1.10.0',
         'wheel==0.26.0',
         'pyyaml==3.11',
-        'logbook==0.12.5'
+        'logbook==0.12.5',
+        'pypandoc==1.1.3',
+        'twine==1.6.5',
+        'microcache==0.2'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

@@ -1,11 +1,14 @@
 import setuptools
-import funcy
 import os
 import pip
+import logbook
+import microcache
+import pypandoc
 from pkg_resources.extern import packaging
 from . import snippets
 from . import helpers
 
+logger = logbook.Logger(__name__)
 VERSION_FILE_NAME = '_version.py'
 
 
@@ -49,7 +52,10 @@ def setup_py_has_exec_block(package_name):
 def setup_py_uses___version__():
     """ Check to make sure setup.py is using the __version__ variable in the setup block """
     setup_py_content = helpers.get_file_content('setup.py')
-    return helpers.value_of_named_argument_in_function('version', 'setup', setup_py_content)
+    ret = helpers.value_of_named_argument_in_function('version', 'setup', setup_py_content)
+    if ret == '__version__':
+        return True
+    return False
 
 
 VERSION_SET_REGEX = r'__version__\s*=\s*[\'"](?P<version>[^\'"]+)[\'"]'
@@ -79,12 +85,17 @@ def get_project_name():
     return ret
 
 
-def get_version(package_name):
+def get_version(package_name, ignore_cache=False):
     """ Get the version which is currently configured by the package """
-    found = helpers.regex_in_package_file(VERSION_SET_REGEX, VERSION_FILE_NAME, package_name)
-    version_file_path = helpers.package_file_path(VERSION_FILE_NAME, package_name)
-    version_file_content = helpers.get_file_content(version_file_path)
-    found = funcy.re_find(VERSION_SET_REGEX, version_file_content)
+    if ignore_cache:
+        with microcache.temporarily_disabled():
+            found = helpers.regex_in_package_file(
+                VERSION_SET_REGEX, VERSION_FILE_NAME, package_name, return_match=True
+            )
+    else:
+        found = helpers.regex_in_package_file(
+            VERSION_SET_REGEX, VERSION_FILE_NAME, package_name, return_match=True
+        )
     if found is None:
         raise ProjectError('found {}, but __version__ is not defined')
     current_version = found['version']
@@ -129,3 +140,32 @@ def version_already_uploaded(project_name, version_str, index_url):
     except (pip.exceptions.DistributionNotFound, pip.exceptions.InstallationError):
         return False
     return True
+
+
+def convert_readme_to_rst():
+    project_files = os.listdir('.')
+    for filename in project_files:
+        if filename.lower() == 'readme':
+            raise ProjectError(
+                'found {} in project directory...'.format(filename) +
+                'not sure what to do with it, refusing to convert'
+            )
+        elif filename.lower() == 'readme.rst':
+            raise ProjectError(
+                'found {} in project directory...'.format(filename) +
+                'refusing to overwrite'
+            )
+    for filename in project_files:
+        if filename.lower() == 'readme.md':
+            rst_filename = 'README.rst'
+            logger.info('converting {} to {}'.format(filename, rst_filename))
+            try:
+                rst_content = pypandoc.convert(filename, 'rst')
+                with open('README.rst', 'w') as rst_file:
+                    rst_file.write(rst_content)
+                return
+            except OSError as e:
+                raise ProjectError(
+                    'could not convert readme to rst due to pypandoc error:' + os.linesep + str(e)
+                )
+    raise ProjectError('could not find any README.md file to convert')

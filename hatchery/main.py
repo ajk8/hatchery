@@ -28,7 +28,25 @@ General options:
 
 Packaging options:
 
+    --convert-readme-to-rst
+                    convert a github-preferred README.md file into README.rst
+                    on the fly -- NOTE: this may require the OS-level pandoc
+                    utility to be manually installed
     --no-wheel      don't bother creating a wheel
+
+Config files:
+
+    hatchery endeavors to have as few implicit requirements on your project
+    as possible (and those are managed using the "check" task).  In order
+    for it to do its work, therefore, some configuration has to be provided.
+    This is done using config files.  There are two files (user-level, and
+    project-level) that can be used to specify these configuration files:
+
+        {config_files}
+
+    In the case where both files define the same parameters, the project-level
+    file wins.  See README.md for more information about the available
+    configuration parameters.
 """
 
 import docopt
@@ -54,9 +72,17 @@ def _get_package_name_or_die():
     return package_name
 
 
-def _get_config_or_die():
+def _get_config_or_die(required_params=[], calling_task=None):
     try:
         config_dict = config.from_yaml()
+        for key in required_params:
+            if key not in config_dict.keys() or config_dict[key] is None:
+                logger.error(
+                    '{} was not set in hatchery config files, cannot continue with {}'.format(
+                        key, calling_task
+                    )
+                )
+                raise SystemExit(1)
     except config.ConfigError as e:
         logger.error(str(e))
         raise SystemExit(1)
@@ -83,20 +109,23 @@ def _check_and_set_version(release_version, package_name):
 def task_upload(args):
     workdir.sync()
     with workdir.as_cwd():
-        config_dict = _get_config_or_die()
+        config_dict = _get_config_or_die(
+            calling_task='upload',
+            required_params=['pypi_repository']
+        )
         pypi_repository = config_dict['pypi_repository']
         pypirc_dict = config.from_pypirc(pypi_repository)
         index_url = pypirc_dict['repository']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
-        release_version = project.get_version(package_name)
+        release_version = project.get_version(package_name, ignore_cache=True)
         _valid_version_or_die(release_version)
         if project.version_already_uploaded(project_name, release_version, index_url):
             logger.error('version {} already exists in index {}'.format(
                 release_version, index_url
             ))
             raise SystemExit(1)
-        result = executor.call('twine', 'upload', '-r', pypi_repository, 'dist/*')
+        result = executor.call(('twine', 'upload', '-r', pypi_repository, 'dist/*'))
         if result.exitval and 'not allowed to edit' in result.stderr:
             logger.error('could not upload packages, try `hatchery register`')
             raise SystemExit(1)
@@ -106,11 +135,14 @@ def task_register(args):
     release_version = args['--release-version']
     workdir.sync()
     with workdir.as_cwd():
-        config_dict = _get_config_or_die()
+        config_dict = _get_config_or_die(
+            calling_task='register',
+            required_params=['pypi_repository']
+        )
         pypi_repository = config_dict['pypi_repository']
         package_name = _get_package_name_or_die()
         _check_and_set_version(release_version, package_name)
-        result = executor.setup('register', '-r', pypi_repository)
+        result = executor.setup(('register', '-r', pypi_repository))
         if result.exitval or '(400)' in result.stdout:
             logger.error('failed to register project')
             raise SystemExit(result.exitval)
@@ -118,15 +150,22 @@ def task_register(args):
 
 def task_package(args):
     release_version = args['--release-version']
+    readme_to_rst = args['--convert-readme-to-rst']
     no_wheel = args['--no-wheel']
     workdir.sync()
     with workdir.as_cwd():
         package_name = _get_package_name_or_die()
         _check_and_set_version(release_version, package_name)
+        if readme_to_rst:
+            try:
+                project.convert_readme_to_rst()
+            except project.ProjectError as e:
+                logger.error(e)
+                raise SystemExit(1)
         setup_args = ['sdist']
         if not no_wheel:
             setup_args.append('bdist_wheel')
-        result = executor.setup(*setup_args)
+        result = executor.setup(setup_args)
         if result.exitval:
             logger.error('failed to package project')
             raise SystemExit(result.exitval)
@@ -135,10 +174,10 @@ def task_package(args):
 def task_test(args):
     workdir.sync()
     with workdir.as_cwd():
-        config_dict = _get_config_or_die()
-        if not config_dict['test_command']:
-            logger.error('no test command found in config!')
-            raise SystemExit(1)
+        config_dict = _get_config_or_die(
+            calling_task='test',
+            required_params=['test_command']
+        )
         test_commands = config_dict['test_command']
         if not funcy.is_list(test_commands):
             test_commands = [test_commands]
@@ -168,7 +207,9 @@ def task_check(args):
         ret = 1
     logger.debug('checking state of setup.py')
     if not project.setup_py_has_exec_block(package_name):
-        setup_py_block = snippets.get_snippet_content('setup.py')
+        setup_py_block = snippets.get_snippet_content(
+            'setup.py', package_name=package_name, version_file=project.VERSION_FILE_NAME
+        )
         logger.error('setup.py must have the following block: ' + os.linesep + setup_py_block)
         ret = 1
     if not project.setup_py_uses___version__():
@@ -186,13 +227,9 @@ def task_check(args):
         logger.info('everything looks good!')
 
 
-def _all_tasks():
-    ret = {}
-    prefix = 'task_'
-    for name, func in globals().items():
-        if name.startswith(prefix):
-            ret[name.replace(prefix, '')] = func
-    return ret
+ORDERED_TASKS = ['check', 'clean', 'test', 'package', 'register', 'upload']
+CHECK_TASKS = [t for t in ORDERED_TASKS if t != 'clean']
+RELVERSION_TASKS = ['package', 'register']
 
 
 def hatchery():
@@ -201,7 +238,7 @@ def hatchery():
     task_list = args['<task>']
 
     if not task_list or 'help' in task_list or args['--help']:
-        print(__doc__.format(version=_version.__version__))
+        print(__doc__.format(version=_version.__version__, config_files=config.CONFIG_LOCATIONS))
         return 0
 
     level_str = args['--log-level']
@@ -213,15 +250,24 @@ def hatchery():
         logger.error('received invalid log level: ' + level_str)
         return 1
 
-    all_tasks = _all_tasks()
+    for task in CHECK_TASKS:
+        if task in task_list:
+            task_check(args)
+            break
+
+    for task in RELVERSION_TASKS:
+        if task in task_list and not args['--release-version']:
+            logger.error('--release-version is required for package and register tasks')
+            return 1
 
     for task in task_list:
-        if task not in all_tasks.keys():
+        if task not in ORDERED_TASKS:
             logger.error('received invalid task: ' + task)
             return 1
 
     # all commands will raise a SystemExit if they fail
-    for task, func in all_tasks.items():
-        if task in task_list:
-            func(args)
+    # check will have already been run
+    for task in ORDERED_TASKS:
+        if task in task_list and task != 'check':
+            globals()['task_' + task](args)
     return 0
