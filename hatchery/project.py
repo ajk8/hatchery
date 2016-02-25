@@ -5,7 +5,6 @@ import logbook
 import microcache
 import pypandoc
 from pkg_resources.extern import packaging
-from . import snippets
 from . import helpers
 
 logger = logbook.Logger(__name__)
@@ -38,15 +37,12 @@ def package_has_version_file(package_name):
     return os.path.isfile(version_file_path)
 
 
+SETUP_PY_EXEC_REGEX = r'with open\(.+_version\.py.+\)[^\:]+\:\s+exec\(.+read\(\)\)'
+
+
 def setup_py_has_exec_block(package_name):
     """ Check to make sure setup.py is exec'ing _version.py """
-    search_str = snippets.get_snippet_content(
-        snippet_name='setup.py',
-        package_name=package_name,
-        version_file=VERSION_FILE_NAME
-    ).strip()
-    setup_py_content = helpers.get_file_content('setup.py')
-    return search_str in setup_py_content
+    return helpers.regex_in_file(SETUP_PY_EXEC_REGEX, 'setup.py')
 
 
 def setup_py_uses___version__():
