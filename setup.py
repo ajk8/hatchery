@@ -18,7 +18,7 @@ setup(
     package_data={'hatchery': ['snippets/*']},
     entry_points={'console_scripts': ['hatchery=hatchery.main:hatchery']},
     install_requires=[
-        'funcy==1.6',
+        'funcy==1.7',
         'dirsync==2.1',
         'docopt==0.6.2',
         'six==1.10.0',
@@ -27,7 +27,8 @@ setup(
         'logbook==0.12.5',
         'pypandoc==1.1.3',
         'twine==1.6.5',
-        'microcache==0.2'
+        'microcache==0.2',
+        'workdir==0.2'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

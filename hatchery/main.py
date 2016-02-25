@@ -53,14 +53,15 @@ import docopt
 import logbook
 import funcy
 import os
+import workdir
 from . import _version
-from . import workdir
 from . import executor
 from . import project
 from . import config
 from . import snippets
 
 logger = logbook.Logger(__name__)
+workdir.options.path = '.hatchery.work'
 
 
 def _get_package_name_or_die():
@@ -107,7 +108,9 @@ def _check_and_set_version(release_version, package_name):
 
 
 def task_upload(args):
-    workdir.sync()
+    if not os.path.isdir(workdir.options.path):
+        logger.error('{} does not exist, nothing to upload!'.format(workdir.options.path))
+        raise SystemExit(1)
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
             calling_task='upload',
@@ -250,6 +253,11 @@ def hatchery():
         logger.error('received invalid log level: ' + level_str)
         return 1
 
+    for task in task_list:
+        if task not in ORDERED_TASKS:
+            logger.error('received invalid task: ' + task)
+            return 1
+
     for task in CHECK_TASKS:
         if task in task_list:
             task_check(args)
@@ -258,11 +266,6 @@ def hatchery():
     for task in RELVERSION_TASKS:
         if task in task_list and not args['--release-version']:
             logger.error('--release-version is required for package and register tasks')
-            return 1
-
-    for task in task_list:
-        if task not in ORDERED_TASKS:
-            logger.error('received invalid task: ' + task)
             return 1
 
     # all commands will raise a SystemExit if they fail
