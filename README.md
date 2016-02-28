@@ -40,7 +40,9 @@ As previously mentioned, in order to take full advantage of what `hatchery` has 
 
 Parameter | Usage
 --------- | -----
+create_wheel | Create a wheel along with the source distribution during the packaging step.  Defaults to True.
 pypi_repository | String parameter describing which pypi index server to upload packages to.  It actually refers to an alias which must be defined in your [pypirc file](https://docs.python.org/3.5/distutils/packageindex.html#the-pypirc-file)
+readme_to_rst | Convert a README.md file to README.rst on the fly if the former is detected and the latter is not.  Defaults to True.
 test_command | A list of arbitrary shell commands that should be run during the test task.  If any of them fails, the test will be considered a failure.
 
 These parameters should be defined in [yaml format](https://en.wikipedia.org/wiki/YAML) in the file `.hatchery.yml` in the root of your project.  If you want to make any of them global across all your projects, you can also choose to define them in `~/.hatchery/hatchery.yml`; just remember that the project-level file's values will always win!

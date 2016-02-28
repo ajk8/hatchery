@@ -11,8 +11,9 @@ except ImportError:
 PYPIRC_LOCATIONS = ['~/.pypirc']
 CONFIG_LOCATIONS = ['~/.hatchery/hatchery.yml', '.hatchery.yml']
 DEFAULT_CONFIG = {
+    'create_wheel': True,
     'pypi_repository': None,
-    'readme_to_rst': None,
+    'readme_to_rst': True,
     'test_command': None
 }
 

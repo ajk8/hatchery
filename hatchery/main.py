@@ -23,16 +23,13 @@ General options:
     -h, --help      print this help output and quit
     --log-level=LEVEL
                     one of (debug, info, error, critical) [default: info]
+    -s, --show-command-output
+                    show output of all subcommands, even if they succeed.
+                    output of failed commands will be shown irrespective of
+                    this setting
     -r=VER, --release-version=VER
-                    version to use when packaging (registering and uploading)
-
-Packaging options:
-
-    --convert-readme-to-rst
-                    convert a github-preferred README.md file into README.rst
-                    on the fly -- NOTE: this may require the OS-level pandoc
-                    utility to be manually installed
-    --no-wheel      don't bother creating a wheel
+                    version to use when packaging and registering
+                    Note: version will be inferred when uploading
 
 Config files:
 
@@ -153,20 +150,26 @@ def task_register(args):
 
 def task_package(args):
     release_version = args['--release-version']
-    readme_to_rst = args['--convert-readme-to-rst']
-    no_wheel = args['--no-wheel']
     workdir.sync()
     with workdir.as_cwd():
+        config_dict = _get_config_or_die(
+            calling_task='register',
+            required_params=['create_wheel', 'readme_to_rst']
+        )
         package_name = _get_package_name_or_die()
         _check_and_set_version(release_version, package_name)
-        if readme_to_rst:
-            try:
-                project.convert_readme_to_rst()
-            except project.ProjectError as e:
-                logger.error(e)
-                raise SystemExit(1)
+        if config_dict['readme_to_rst']:
+            if project.project_has_readme_md():
+                try:
+                    project.convert_readme_to_rst()
+                except project.ProjectError as e:
+                    if 'could not convert' in str(e):
+                        logger.error(e)
+                        raise SystemExit(1)
+                    else:
+                        logger.info(e)
         setup_args = ['sdist']
-        if not no_wheel:
+        if config_dict['create_wheel']:
             setup_args.append('bdist_wheel')
         result = executor.setup(setup_args)
         if result.exitval:

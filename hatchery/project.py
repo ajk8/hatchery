@@ -140,7 +140,16 @@ def version_already_uploaded(project_name, version_str, index_url):
     return True
 
 
+def project_has_readme_md():
+    """ See if project has a readme.md file """
+    for filename in os.listdir('.'):
+        if filename.lower() == 'readme.md':
+            return True
+    return False
+
+
 def convert_readme_to_rst():
+    """ Attempt to convert a README.md file into README.rst """
     project_files = os.listdir('.')
     for filename in project_files:
         if filename.lower() == 'readme':
