@@ -1,21 +1,24 @@
 from setuptools import setup
+from imp import find_module, load_module
 
+PROJECT_NAME = 'hatchery'
+GITHUB_USER = 'ajk8'
+GITHUB_ROOT = 'https://github.com/{}/{}'.format(GITHUB_USER, PROJECT_NAME)
 
-with open('hatchery/_version.py') as f:
-    exec(f.read())
-
+found = find_module('_version', [PROJECT_NAME])
+_version = load_module('_version', *found)
 
 setup(
-    name='hatchery',
-    version=__version__,
+    name=PROJECT_NAME,
+    version=_version.__version__,
     description='Continuous delivery helpers for python projects',
     author='Adam Kaufman',
     author_email='kaufman.blue@gmail.com',
-    url='https://github.com/ajk8/hatchery',
-    download_url='https://github.com/ajk8/hatchery/tarball/' + __version__,
+    url='https://github.com/ajk8/' + PROJECT_NAME,
+    download_url='{}/tarball/{}'.format(GITHUB_ROOT, _version.__version__),
     license='MIT',
-    packages=['hatchery'],
-    package_data={'hatchery': ['snippets/*']},
+    packages=[PROJECT_NAME],
+    package_data={PROJECT_NAME: ['snippets/*']},
     entry_points={'console_scripts': ['hatchery=hatchery.main:hatchery']},
     install_requires=[
         'funcy>=1.4',

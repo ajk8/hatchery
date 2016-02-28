@@ -236,20 +236,14 @@ def task_check(args):
         ))
         ret = 1
     logger.debug('checking state of setup.py')
-    if not project.setup_py_has_exec_block(package_name):
+    if not project.setup_py_uses__version_py() or not project.setup_py_uses___version__():
         setup_py_block = snippets.get_snippet_content(
             'setup.py', package_name=package_name, version_file=project.VERSION_FILE_NAME
         )
-        logger.error('setup.py must have the following block: ' + os.linesep + setup_py_block)
-        ret = 1
-    if not project.setup_py_uses___version__():
         logger.error(os.linesep.join((
-            'setup.py must use the __version__ variable imported by the exec block',
-            'setup(',
-            '    ...',
-            '    version=__version__,',
-            '    ...',
-            ')'
+            'could not detect valid method in setup.py:',
+            '',
+            setup_py_block
         )))
         ret = 1
     if ret:

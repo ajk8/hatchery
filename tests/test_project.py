@@ -50,10 +50,10 @@ def test_project_has_setup_py(tmpdir):
         assert project.project_has_setup_py() is True
 
 
-def test_setup_py_has_exec_block(tmpdir):
+def test_setup_py_uses__version_py(tmpdir):
     with tmpdir.as_cwd():
         open('setup.py', 'w').close()
-        assert project.setup_py_has_exec_block(PACKAGE_NAME) is False
+        assert project.setup_py_uses__version_py() is False
         snippet_content = snippets.get_snippet_content(
             snippet_name='setup.py',
             package_name=PACKAGE_NAME,
@@ -61,7 +61,7 @@ def test_setup_py_has_exec_block(tmpdir):
         )
         with open('setup.py', 'a') as setup_py:
             setup_py.write(snippet_content)
-        assert project.setup_py_has_exec_block(PACKAGE_NAME) is True
+        assert project.setup_py_uses__version_py() is True
 
 
 def test_setup_py_uses___version__(tmpdir):

@@ -37,21 +37,23 @@ def package_has_version_file(package_name):
     return os.path.isfile(version_file_path)
 
 
-SETUP_PY_EXEC_REGEX = r'with open\(.+_version\.py.+\)[^\:]+\:\s+exec\(.+read\(\)\)'
+SETUP_PY_REGEX1 = r'with open\(.+_version\.py.+\)[^\:]+\:\s+exec\(.+read\(\)\)'
+SETUP_PY_REGEX2 = r'=\s*find_module\(.+_version.+\)\s+_version\s*=\s*load_module\(.+_version.+\)'
 
 
-def setup_py_has_exec_block(package_name):
+def setup_py_uses__version_py():
     """ Check to make sure setup.py is exec'ing _version.py """
-    return helpers.regex_in_file(SETUP_PY_EXEC_REGEX, 'setup.py')
+    for regex in (SETUP_PY_REGEX1, SETUP_PY_REGEX2):
+        if helpers.regex_in_file(regex, 'setup.py'):
+            return True
+    return False
 
 
 def setup_py_uses___version__():
     """ Check to make sure setup.py is using the __version__ variable in the setup block """
     setup_py_content = helpers.get_file_content('setup.py')
     ret = helpers.value_of_named_argument_in_function('version', 'setup', setup_py_content)
-    if ret == '__version__':
-        return True
-    return False
+    return ret is not None and '__version__' in ret
 
 
 VERSION_SET_REGEX = r'__version__\s*=\s*[\'"](?P<version>[^\'"]+)[\'"]'
