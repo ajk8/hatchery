@@ -1,13 +1,13 @@
 import setuptools
 import os
 import pip
-import logbook
+import logging
 import microcache
 import pypandoc
 from pkg_resources.extern import packaging
 from . import helpers
 
-logger = logbook.Logger(__name__)
+logger = logging.getLogger(__name__)
 VERSION_FILE_NAME = '_version.py'
 
 
@@ -75,7 +75,9 @@ def package_uses___version__(package_name):
 def get_project_name():
     """ Grab the project name out of setup.py """
     setup_py_content = helpers.get_file_content('setup.py')
-    ret = helpers.value_of_named_argument_in_function('name', 'setup', setup_py_content)
+    ret = helpers.value_of_named_argument_in_function(
+        'name', 'setup', setup_py_content, resolve_varname=True
+    )
     if ret and ret[0] == ret[-1] in ('"', "'"):
         ret = ret[1:-1]
     return ret

@@ -9,7 +9,8 @@ SimplifiedToken = collections.namedtuple('SimplifiedToken', ('typenum', 'value')
 
 
 @microcache.this
-def value_of_named_argument_in_function(argument_name, function_name, search_str):
+def value_of_named_argument_in_function(argument_name, function_name, search_str,
+                                        resolve_varname=False):
     """ Parse an arbitrary block of python code to get the value of a named argument
         from inside a function call
     """
@@ -21,6 +22,7 @@ def value_of_named_argument_in_function(argument_name, function_name, search_str
     token_generator = tokenize.generate_tokens(readline)
     tokens = [SimplifiedToken(toknum, tokval) for toknum, tokval, _, _, _ in token_generator]
     in_function = False
+    is_var = False
     for i in range(len(tokens)):
         if (
             not in_function and
@@ -34,7 +36,27 @@ def value_of_named_argument_in_function(argument_name, function_name, search_str
             tokens[i].typenum == tokenize.NAME and tokens[i].value == argument_name and
             tokens[i+1].typenum == tokenize.OP and tokens[i+1].value == '='
         ):
+            # value is set to another variable
+            if tokens[i+2].typenum == 1:
+                is_var = True
+                argument_name = tokens[i+2].value
+                break
             return tokens[i+2].value
+
+    # this is very dumb logic, and only works if the function argument is set to a variable
+    # which is set to a string value
+    if is_var and resolve_varname:
+        for i in range(len(tokens)):
+            if (
+                tokens[i].typenum == tokenize.NAME and tokens[i].value == argument_name and
+                tokens[i+1].typenum == tokenize.OP and tokens[i+1].value == '='
+            ):
+                return tokens[i+2].value
+
+    # return the argument if not asked to resolve further
+    elif is_var:
+        return argument_name
+
     return None
 
 

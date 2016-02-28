@@ -50,7 +50,7 @@ Config files:
 """
 
 import docopt
-import logbook
+import logging
 import funcy
 import os
 import workdir
@@ -60,7 +60,7 @@ from . import project
 from . import config
 from . import snippets
 
-logger = logbook.Logger(__name__)
+logger = logging.getLogger(__name__)
 workdir.options.path = '.hatchery.work'
 
 
@@ -124,8 +124,8 @@ def task_upload(args):
         release_version = project.get_version(package_name, ignore_cache=True)
         _valid_version_or_die(release_version)
         if project.version_already_uploaded(project_name, release_version, index_url):
-            logger.error('version {} already exists in index {}'.format(
-                release_version, index_url
+            logger.error('{}=={} already exists on index {}'.format(
+                project_name, release_version, index_url
             ))
             raise SystemExit(1)
         result = executor.call(('twine', 'upload', '-r', pypi_repository, 'dist/*'))
@@ -191,6 +191,7 @@ def task_test(args):
 
 
 def task_clean(args):
+    logger.info('cleaning up workspace')
     workdir.remove()
 
 
@@ -246,10 +247,10 @@ def hatchery():
 
     level_str = args['--log-level']
     try:
-        level_const = logbook.lookup_level(level_str.upper())
-        logbook.StderrHandler(level=level_const).push_application()
+        level_const = getattr(logging, level_str.upper())
+        logging.basicConfig(level=level_const)
     except LookupError:
-        logbook.StderrHandler().push_application()
+        logging.basicConfig()
         logger.error('received invalid log level: ' + level_str)
         return 1
 

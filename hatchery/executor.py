@@ -1,11 +1,11 @@
 import subprocess
 import sys
 import shlex
-import logbook
+import logging
 import collections
 import funcy
 
-logger = logbook.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 CallResult = collections.namedtuple('CallResult', ('exitval', 'stdout', 'stderr'))
