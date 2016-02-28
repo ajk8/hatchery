@@ -226,20 +226,16 @@ def task_check(args):
     ret = 0
     logger.debug('verifying that project has a single package')
     package_name = project.get_package_name()
-    logger.debug('checking state of {} file'.format(project.VERSION_FILE_NAME))
+    logger.debug('checking state of _version.py file')
     if not project.package_has_version_file(package_name):
-        logger.error('package does not have a {} file'.format(project.VERSION_FILE_NAME))
+        logger.error('package does not have a _version.py file')
         ret = 1
     elif not project.version_file_has___version__(package_name):
-        logger.error('package has a {} file but does not define a __version__ variable'.format(
-            project.VERSION_FILE_NAME
-        ))
+        logger.error('package has a _version.py file but does not define a __version__ variable')
         ret = 1
     logger.debug('checking state of setup.py')
     if not project.setup_py_uses__version_py() or not project.setup_py_uses___version__():
-        setup_py_block = snippets.get_snippet_content(
-            'setup.py', package_name=package_name, version_file=project.VERSION_FILE_NAME
-        )
+        setup_py_block = snippets.get_snippet_content('setup.py', package_name=package_name)
         logger.error(os.linesep.join((
             'could not detect valid method in setup.py:',
             '',

@@ -56,8 +56,7 @@ def test_setup_py_uses__version_py(tmpdir):
         assert project.setup_py_uses__version_py() is False
         snippet_content = snippets.get_snippet_content(
             snippet_name='setup.py',
-            package_name=PACKAGE_NAME,
-            version_file=project.VERSION_FILE_NAME
+            package_name=PACKAGE_NAME
         )
         with open('setup.py', 'a') as setup_py:
             setup_py.write(snippet_content)
@@ -76,45 +75,20 @@ def test_setup_py_uses___version__(tmpdir):
 def test_package_has_version_file(tmpdir):
     with tmpdir.as_cwd():
         assert project.package_has_version_file(PACKAGE_NAME) is False
-        version_file = helpers.package_file_path(project.VERSION_FILE_NAME, PACKAGE_NAME)
+        version_file = helpers.package_file_path('_version.py', PACKAGE_NAME)
         _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(version_file)])
         assert project.package_has_version_file(PACKAGE_NAME) is True
 
 
 def test_version_file_has___version__(tmpdir):
     with tmpdir.as_cwd():
-        version_file = helpers.package_file_path(project.VERSION_FILE_NAME, PACKAGE_NAME)
+        version_file = helpers.package_file_path('_version.py', PACKAGE_NAME)
         _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(version_file)])
         assert project.version_file_has___version__(PACKAGE_NAME) is False
-        snippet_content = snippets.get_snippet_content(project.VERSION_FILE_NAME)
+        snippet_content = snippets.get_snippet_content('_version.py')
         with open(version_file, 'a') as _version_py:
             _version_py.write(snippet_content)
         assert project.version_file_has___version__(PACKAGE_NAME) is True
-
-
-def test_version_file_has___version_info__(tmpdir):
-    with tmpdir.as_cwd():
-        version_file = helpers.package_file_path(project.VERSION_FILE_NAME, PACKAGE_NAME)
-        _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(version_file)])
-        assert project.version_file_has___version_info__(PACKAGE_NAME) is False
-        snippet_content = snippets.get_snippet_content(project.VERSION_FILE_NAME)
-        with open(version_file, 'a') as _version_py:
-            _version_py.write(snippet_content)
-        assert project.version_file_has___version_info__(PACKAGE_NAME) is True
-
-
-def test_package_uses___version__(tmpdir):
-    with tmpdir.as_cwd():
-        init_file = helpers.package_file_path('__init__.py', PACKAGE_NAME)
-        _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(init_file)])
-        assert project.package_uses___version__(PACKAGE_NAME) is False
-        with open(init_file, 'w') as init_py:
-            init_py.write('from _version import __version__')
-        assert project.package_uses___version__(PACKAGE_NAME) is True
-        snippet_content = snippets.get_snippet_content('__init__.py')
-        with open(init_file, 'w') as init_py:
-            init_py.write(snippet_content)
-        assert project.package_uses___version__(PACKAGE_NAME) is True
 
 
 def test_get_project_name(tmpdir):
@@ -130,7 +104,7 @@ def test_get_version(tmpdir):
     with tmpdir.as_cwd():
         with pytest.raises(IOError):
             project.get_version(PACKAGE_NAME)
-        version_file = helpers.package_file_path(project.VERSION_FILE_NAME, PACKAGE_NAME)
+        version_file = helpers.package_file_path('_version.py', PACKAGE_NAME)
         _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(version_file)])
         with pytest.raises(project.ProjectError):
             project.get_version(PACKAGE_NAME)
@@ -138,7 +112,7 @@ def test_get_version(tmpdir):
             _version_py.write("__version__='someversion'")
         with microcache.temporarily_enabled():
             assert project.get_version(PACKAGE_NAME) == 'someversion'
-            snippet_content = snippets.get_snippet_content(project.VERSION_FILE_NAME)
+            snippet_content = snippets.get_snippet_content('_version.py')
             with open(version_file, 'w') as _version_py:
                 _version_py.write(snippet_content)
             assert project.get_version(PACKAGE_NAME) == 'someversion'
@@ -147,9 +121,9 @@ def test_get_version(tmpdir):
 
 def test_set_version(tmpdir):
     with tmpdir.as_cwd():
-        version_file = helpers.package_file_path(project.VERSION_FILE_NAME, PACKAGE_NAME)
+        version_file = helpers.package_file_path('_version.py', PACKAGE_NAME)
         _make_package(PACKAGE_NAME, empty_module_files=[os.path.basename(version_file)])
-        snippet_content = snippets.get_snippet_content(project.VERSION_FILE_NAME)
+        snippet_content = snippets.get_snippet_content('_version.py')
         with open(version_file, 'w') as _version_py:
             _version_py.write(snippet_content)
         project.set_version(PACKAGE_NAME, '1.2.3')

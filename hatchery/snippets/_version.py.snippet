@@ -1,2 +1,8 @@
+# In order for hatchery to do its work, there must be a _version.py file
+# in the root package.  This _version module must define a variable called
+# __version__, which can then be imported elsewhere in the package and, more
+# importantly, be imported in setup.py.  A fine _version.py file might look
+# like this:
+
 __version__ = 'managed by hatchery'
 __version_info__ = '.'.split(__version__)

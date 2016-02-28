@@ -1,13 +1,13 @@
 # In order for hatchery to do its work, setup.py must import and use
-# the __version__ parameter from {version_file}.  There are two "approved"
+# the __version__ parameter from _version.py.  There are two "approved"
 # ways to do this.  In other words, implement one of the following two
 # methods in order to pass this check!
 
 #
-# method 1: exec {version_file} into global namespace (good)
+# method 1: exec _version.py into global namespace (good)
 #
 
-with open('{package_name}/{version_file}') as f:
+with open('{package_name}/_version.py') as f:
     exec(f.read())
 
 setup(
@@ -16,13 +16,13 @@ setup(
 )
 
 #
-# method 2: import {version_file} into _version namespace (better!)
+# method 2: import _version.py into _version namespace (better!)
 #
 
 from imp import find_module, load_module
 
-found = find_module('{version_file}', ['{package_name}''])
-_version = load_module('{version_file}', *found)
+found = find_module('_version', ['{package_name}''])
+_version = load_module('_version', *found)
 
 setup(
     name={package_name},
