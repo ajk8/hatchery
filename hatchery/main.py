@@ -104,7 +104,16 @@ def _check_and_set_version(release_version, package_name):
     return release_version
 
 
+def _log_failure_and_die(error_msg, call_result, log_full_result):
+    msg = error_msg
+    if log_full_result:
+        msg += os.linesep.join((':', call_result.format_error_msg()))
+    logger.error(msg)
+    raise SystemExit(1)
+
+
 def task_upload(args):
+    suppress_output = not args['--show-command-output']
     if not os.path.isdir(workdir.options.path):
         logger.error('{} does not exist, nothing to upload!'.format(workdir.options.path))
         raise SystemExit(1)
@@ -125,14 +134,22 @@ def task_upload(args):
                 project_name, release_version, index_url
             ))
             raise SystemExit(1)
-        result = executor.call(('twine', 'upload', '-r', pypi_repository, 'dist/*'))
-        if result.exitval and 'not allowed to edit' in result.stderr:
-            logger.error('could not upload packages, try `hatchery register`')
+        result = executor.call(
+            ('twine', 'upload', '-r', pypi_repository, 'dist/*'), suppress_output=suppress_output
+        )
+        if result.exitval:
+            if 'not allowed to edit' in result.stderr:
+                logger.error('could not upload packages, try `hatchery register`')
+            else:
+                _log_failure_and_die(
+                    'failed to upload packages', result, log_full_result=suppress_output
+                )
             raise SystemExit(1)
 
 
 def task_register(args):
     release_version = args['--release-version']
+    suppress_output = not args['--show-command-output']
     workdir.sync()
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
@@ -142,14 +159,18 @@ def task_register(args):
         pypi_repository = config_dict['pypi_repository']
         package_name = _get_package_name_or_die()
         _check_and_set_version(release_version, package_name)
-        result = executor.setup(('register', '-r', pypi_repository))
+        result = executor.setup(
+            ('register', '-r', pypi_repository), suppress_output=suppress_output
+        )
         if result.exitval or '(400)' in result.stdout:
-            logger.error('failed to register project')
-            raise SystemExit(result.exitval)
+            _log_failure_and_die(
+                'failed to register project', result, log_full_result=suppress_output
+            )
 
 
 def task_package(args):
     release_version = args['--release-version']
+    suppress_output = not args['--show-command-output']
     workdir.sync()
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
@@ -171,13 +192,15 @@ def task_package(args):
         setup_args = ['sdist']
         if config_dict['create_wheel']:
             setup_args.append('bdist_wheel')
-        result = executor.setup(setup_args)
+        result = executor.setup(setup_args, suppress_output=suppress_output)
         if result.exitval:
-            logger.error('failed to package project')
-            raise SystemExit(result.exitval)
+            _log_failure_and_die(
+                'failed to package project', result, log_full_result=suppress_output
+            )
 
 
 def task_test(args):
+    suppress_output = not args['--show-command-output']
     workdir.sync()
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
@@ -188,9 +211,9 @@ def task_test(args):
         if not funcy.is_list(test_commands):
             test_commands = [test_commands]
         for cmd_str in test_commands:
-            result = executor.call(cmd_str)
+            result = executor.call(cmd_str, suppress_output=suppress_output)
             if result.exitval:
-                raise SystemExit(result.exitval)
+                _log_failure_and_die('tests failed', result, log_full_result=suppress_output)
 
 
 def task_clean(args):
@@ -220,13 +243,14 @@ def task_check(args):
         logger.error('setup.py must have the following block: ' + os.linesep + setup_py_block)
         ret = 1
     if not project.setup_py_uses___version__():
-        logger.error(
-            'setup.py must use the __version__ variable imported by the exec block' + os.linesep +
-            'setup(' + os.linesep +
-            '    ...' + os.linesep +
-            '    version=__version__,' + os.linesep +
-            '    ...' + os.linesep +
-            ')')
+        logger.error(os.linesep.join((
+            'setup.py must use the __version__ variable imported by the exec block',
+            'setup(',
+            '    ...',
+            '    version=__version__,',
+            '    ...',
+            ')'
+        )))
         ret = 1
     if ret:
         raise SystemExit(ret)
@@ -277,4 +301,6 @@ def hatchery():
     for task in ORDERED_TASKS:
         if task in task_list and task != 'check':
             globals()['task_' + task](args)
+
+    logger.info("all's well that ends well...hatchery out")
     return 0
