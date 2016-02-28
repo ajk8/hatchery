@@ -47,6 +47,8 @@ test_command | A list of arbitrary shell commands that should be run during the 
 
 These parameters should be defined in [yaml format](https://en.wikipedia.org/wiki/YAML) in the file `.hatchery.yml` in the root of your project.  If you want to make any of them global across all your projects, you can also choose to define them in `~/.hatchery/hatchery.yml`; just remember that the project-level file's values will always win!
 
+See `.hatchery.yml` in this repository for a contextual example.
+
 Aside: there are lots of different opinions about how best to test one's code.  There are many frameworks, and many ways to execute them.  Allowing users to have complete control over this was a key design decision.  You want to use `tox`?  Go for it!  Prefer using `py.test` directly?  Fine by me.  Think `pylint` is important?  Throw it on there!  The point is, choose what testing feedback is important to you, and `hatchery` will execute it for you.
 
 ## Examples
