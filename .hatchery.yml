@@ -1,15 +1,5 @@
 ---
 
-# create a wheel along with the source distribution
-create_wheel: True
-
-# repository to upload files to (as defined in .pypirc)
-# see https://docs.python.org/3.5/distutils/packageindex.html#the-pypirc-file
-pypi_repository: 'pypi'
-
-# convert README.md to README.rst on the fly
-readme_to_rst: True
-
 # commands to execute for testing
 test_command:
     - py.test tests --doctest-modules hatchery --cov hatchery --cov-report=term-missing

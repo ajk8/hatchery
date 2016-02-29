@@ -12,11 +12,14 @@ in which they are specified.  Available tasks are:
 
     help        print this help output (ignores all other tasks)
     check       check to see if this project conforms to hatchery requirements
+    config      print the computed config contents to the console
     clean       clean up the working directory
     test        run tests according to commands specified in .hatchery.yml
     package     create binary packages to be distributed
     register    register your package with the index if you haven't already
     upload      upload all created packages to a configured pypi index
+    tag         tag your git repository with the release version and push
+                it back up to the origin
 
 General options:
 
@@ -30,6 +33,16 @@ General options:
     -r=VER, --release-version=VER
                     version to use when packaging and registering
                     Note: version will be inferred when uploading
+
+Notes on tagging:
+
+    Creating a tag requires a clean working copy, which means that there are
+    two very important prerequisites:
+
+        1. you should not use hatchery's tagging (and uploading) functionality
+           until you have committed all of your changes (good practice anyway)
+        2. you must have an entry for .hatchery.work in your .gitignore file
+           so that hatchery itself does not dirty up your working tree
 
 Config files:
 
@@ -51,6 +64,8 @@ import logging
 import funcy
 import os
 import workdir
+import git
+import ruamel.yaml as yaml
 from . import _version
 from . import executor
 from . import project
@@ -129,6 +144,37 @@ def _log_failure_and_die(error_msg, call_result, log_full_result):
     raise SystemExit(1)
 
 
+def task_tag(args):
+    if not os.path.isdir(workdir.options.path):
+        logger.error('{} does not exist, cannot fetch tag version!'.format(workdir.options.path))
+        raise SystemExit(1)
+    with workdir.as_cwd():
+        config_dict = _get_config_or_die(
+            calling_task='upload',
+            required_params=['git_remote_name']
+        )
+        git_remote_name = config_dict['git_remote_name']
+        package_name = _get_package_name_or_die()
+        release_version = project.get_version(package_name, ignore_cache=True)
+
+    # this part actually happens outside of the working directory!
+    repo = git.Repo()
+    if repo.is_dirty():
+        logger.error('cannot create tag, repo is dirty')
+        raise SystemExit(1)
+    if git_remote_name not in [x.name for x in repo.remotes]:
+        logger.error(
+            'cannot push tag to remote "{}" as it is not defined in repo'.format(git_remote_name)
+        )
+        raise SystemExit(1)
+    repo.create_tag(
+        path=release_version,
+        message='tag {} created by hatchery'.format(release_version)
+    )
+    repo.remotes[git_remote_name].push(tags=True)
+    logger.info('version {} tagged and pushed!'.format(release_version))
+
+
 def task_upload(args):
     suppress_output = not args['--stream-command-output']
     if not os.path.isdir(workdir.options.path):
@@ -173,6 +219,11 @@ def task_register(args):
         pypi_repository = config_dict['pypi_repository']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
+        if not release_version:
+            release_version = project.get_version(package_name)
+            if not project.version_is_valid(release_version):
+                logger.info('using version 0.0 for registration purposes')
+                release_version = '0.0'
         _check_and_set_version(release_version, package_name, project_name, pypi_repository)
         result = executor.setup(
             ('register', '-r', pypi_repository), suppress_output=suppress_output
@@ -237,12 +288,23 @@ def task_test(args):
 
 
 def task_clean(args):
-    logger.info('cleaning up workspace')
     workdir.remove()
 
 
+def task_config(args):
+    config_dict = _get_config_or_die(
+        calling_task='config',
+        required_params=[]
+    )
+    print(os.linesep.join((
+        '### yaml ###',
+        '',
+        yaml.dump(config_dict, Dumper=yaml.RoundTripDumper, indent=4),
+        '### /yaml ###'
+    )))
+
+
 def task_check(args):
-    logger.info('checking project for requirements')
     logger.debug('verifying that project has a single package')
     try:
         package_name = project.get_package_name()
@@ -271,12 +333,11 @@ def task_check(args):
         ret = 1
     if ret:
         raise SystemExit(ret)
-    logger.info('everything looks good!')
+    logger.info('all checks passed!')
 
 
-ORDERED_TASKS = ['check', 'clean', 'test', 'package', 'register', 'upload']
-CHECK_TASKS = [t for t in ORDERED_TASKS if t != 'clean']
-RELVERSION_TASKS = ['package', 'register']
+ORDERED_TASKS = ['check', 'config', 'clean', 'test', 'package', 'register', 'upload', 'tag']
+CHECK_TASKS = [t for t in ORDERED_TASKS if t not in ('config', 'clean')]
 
 
 def hatchery():
@@ -301,6 +362,7 @@ def hatchery():
 
     for task in task_list:
         if task not in ORDERED_TASKS:
+            logger.info('starting task: check')
             logger.error('received invalid task: ' + task)
             return 1
 
@@ -309,15 +371,23 @@ def hatchery():
             task_check(args)
             break
 
-    for task in RELVERSION_TASKS:
-        if task in task_list and not args['--release-version']:
-            logger.error('--release-version is required for package and register tasks')
-            return 1
+    if 'package' in task_list and not args['--release-version']:
+        logger.error('--release-version is required for the package task')
+        return 1
+
+    config_dict = _get_config_or_die(
+        calling_task='hatchery',
+        required_params=['auto_push_tag']
+    )
+    if config_dict['auto_push_tag'] and 'upload' in task_list:
+        logger.info('adding task: tag (auto_push_tag==True)')
+        task_list.append('tag')
 
     # all commands will raise a SystemExit if they fail
     # check will have already been run
     for task in ORDERED_TASKS:
         if task in task_list and task != 'check':
+            logger.info('starting task: ' + task)
             globals()['task_' + task](args)
 
     logger.info("all's well that ends well...hatchery out")

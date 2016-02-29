@@ -36,14 +36,16 @@ As always, it is strongly recommended that you use this inside of a virtual envi
 
 ## Configuration
 
-As previously mentioned, in order to take full advantage of what `hatchery` has to offer, there is a little configuration that is required...and I do mean a little.  As of now, there are only 2 parameters that will do anything:
+As previously mentioned, in order to take full advantage of what `hatchery` has to offer, there is a little configuration that is required...and I do mean a little.  There are a number of parameters avialable, but most of them can just be left to their default values:
 
-Parameter | Usage
---------- | -----
-create_wheel | Create a wheel along with the source distribution during the packaging step.  Defaults to True.
-pypi_repository | String parameter describing which pypi index server to upload packages to.  It actually refers to an alias which must be defined in your [pypirc file](https://docs.python.org/3.5/distutils/packageindex.html#the-pypirc-file)
-readme_to_rst | Convert a README.md file to README.rst on the fly if the former is detected and the latter is not.  Defaults to True.
-test_command | A list of arbitrary shell commands that should be run during the test task.  If any of them fails, the test will be considered a failure.
+Parameter | Default value | Usage
+--------- | ------------- | -----
+`auto_push_tag` | `False` | Automatically run the tag-and-push logic after a successful upload operation
+`create_wheel` | `True` | Create a wheel along with the source distribution during the packaging step
+`git_remote_name` | `'origin'` | The name of the remote to push to when pushing a git tag
+`pypi_repository` | `None` | String parameter describing which pypi index server to upload packages to.  It actually refers to an alias which must be defined in your [pypirc file](https://docs.python.org/3.5/distutils/packageindex.html#the-pypirc-file)
+`readme_to_rst` | `True` | Convert a README.md file to README.rst on the fly if the former is detected and the latter is not
+`test_command` | `None` | A list of arbitrary shell commands that should be run during the test task.  If any of them fails, the test will be considered a failure.
 
 These parameters should be defined in [yaml format](https://en.wikipedia.org/wiki/YAML) in the file `.hatchery.yml` in the root of your project.  If you want to make any of them global across all your projects, you can also choose to define them in `~/.hatchery/hatchery.yml`; just remember that the project-level file's values will always win!
 
@@ -65,12 +67,12 @@ $ hatchery clean test
 
 Register your project with the pypi repository defined in configuration
 ```
-$ hatchery register --release-version=1.2.3
+$ hatchery register
 ```
 
 Create packages (with markdown -> rst conversion)
 ```
-$ hatchery package --release-version=1.2.3 --convert-readme-to-rst
+$ hatchery package --release-version=1.2.3
 ```
 
 Upload your packages to the pypi repository defined in configuration
@@ -80,7 +82,7 @@ $ hatchery upload
 
 String everything together in one go!
 ```
-$ hatchery clean register test package upload --release-version=1.2.3 --convert-readme-to-rst
+$ hatchery clean register test package upload --release-version=1.2.3
 ```
 
 Find out what other great features you're missing out on

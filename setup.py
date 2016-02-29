@@ -14,7 +14,7 @@ setup(
     description='Continuous delivery helpers for python projects',
     author='Adam Kaufman',
     author_email='kaufman.blue@gmail.com',
-    url='https://github.com/ajk8/' + PROJECT_NAME,
+    url=GITHUB_ROOT,
     download_url='{}/tarball/{}'.format(GITHUB_ROOT, _version.__version__),
     license='MIT',
     packages=[PROJECT_NAME],
@@ -24,11 +24,12 @@ setup(
         'funcy>=1.4',
         'docopt>=0.6.2',
         'wheel>=0.26.0',
-        'pyyaml>=3.11',
+        'ruamel.yaml>=0.11.3',
         'pypandoc>=1.1.3',
         'twine>=1.6.5',
         'microcache>=0.2',
-        'workdir>=0.3.1'
+        'workdir>=0.3.1',
+        'gitpython>=1.0.2'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
