@@ -14,4 +14,3 @@ readme_to_rst: True
 test_command:
     - py.test tests --doctest-modules hatchery --cov hatchery --cov-report=term-missing
     - flake8 hatchery
-

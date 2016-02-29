@@ -3,6 +3,7 @@ import os
 import funcy
 import pip
 import microcache
+import requests_mock
 from hatchery import project
 from hatchery import snippets
 from hatchery import helpers
@@ -12,7 +13,9 @@ try:
 except ImportError:
     import mock
 
+PROJECT_NAME = 'myproject'
 PACKAGE_NAME = 'mypackage'
+INDEX_URL = 'https://mocked.pypi.python.org/pypi'
 
 
 def setup_module(module):
@@ -132,20 +135,54 @@ def test_set_version(tmpdir):
         assert found['version'] == '1.2.3'
 
 
-def test_version_already_uploaded_true():
+def test__get_uploaded_versions():
+    api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
+    with requests_mock.mock() as m:
+        m.get(api_url, status_code=404)
+        assert project._get_uploaded_versions(PROJECT_NAME, INDEX_URL) == []
+        m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
+        assert set(project._get_uploaded_versions(PROJECT_NAME, INDEX_URL)) == set(['0.1', '0.2'])
 
-    def _mock_findreq_found(self, req, upgrade):
-        return True
 
-    def _mock_findreq_notfound(self, req, upgrade):
-        raise pip.exceptions.DistributionNotFound("you've been mocked!")
+def test_version_already_uploaded():
+    api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
+    with requests_mock.mock() as m:
+        m.get(api_url, status_code=404)
+        assert project.version_already_uploaded(PROJECT_NAME, '0.1', INDEX_URL) is False
+        m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
+        assert project.version_already_uploaded(PROJECT_NAME, '0.1', INDEX_URL) is True
+        assert project.version_already_uploaded(PROJECT_NAME, '0.3', INDEX_URL) is False
 
-    with mock.patch('pip.index.PackageFinder.find_requirement', _mock_findreq_found):
-        ret = project.version_already_uploaded('someprj', '1.2.3', 'https://pypi.python.org/pypi')
-        assert ret is True
-    with mock.patch('pip.index.PackageFinder.find_requirement', _mock_findreq_notfound):
-        ret = project.version_already_uploaded('someprj', '1.2.3', 'https://pypi.python.org/pypi')
-        assert ret is False
+
+def test_get_latest_uploaded_version():
+    api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
+    with requests_mock.mock() as m:
+        m.get(api_url, status_code=404)
+        assert project.get_latest_uploaded_version(PROJECT_NAME, INDEX_URL) is None
+        m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
+        assert project.get_latest_uploaded_version(PROJECT_NAME, INDEX_URL) == '0.2'
+
+
+def test_version_is_latest():
+    api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
+    with requests_mock.mock() as m:
+        m.get(api_url, status_code=404)
+        assert project.version_is_latest(PROJECT_NAME, '0.1', INDEX_URL)
+        m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
+        assert project.version_is_latest(PROJECT_NAME, '0.1.5', INDEX_URL) is False
+        assert project.version_is_latest(PROJECT_NAME, '0.2', INDEX_URL) is False
+        assert project.version_is_latest(PROJECT_NAME, '0.3', INDEX_URL) is True
+
+
+def test_project_has_readme_md(tmpdir):
+    with tmpdir.as_cwd():
+        assert project.project_has_readme_md() is False
+        open('readme.md', 'w').close()
+        assert project.project_has_readme_md() is True
+        os.remove('readme.md')
+        open('README.md', 'w').close()
+        assert project.project_has_readme_md() is True
+
 
 
 def test_convert_readme_to_rst(tmpdir):

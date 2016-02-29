@@ -36,11 +36,12 @@ password: somepass
 '''
 
 
-def test_from_pypirc(tmpdir):
+def test_from_pypirc(tmpdir, monkeypatch):
+    monkeypatch.setattr(config, 'PYPIRC_LOCATIONS', ['.pypirc'])
     with tmpdir.as_cwd():
         with open('.pypirc', 'w') as pypirc_file:
             pypirc_file.write(PYPIRC_DATA)
-        pypirc_config = config.from_pypirc('notthere', _pypirc_location_for_testing='.pypirc')
+        pypirc_config = config.from_pypirc('notthere')
         assert pypirc_config == {}
-        pypirc_config = config.from_pypirc('pypi', _pypirc_location_for_testing='.pypirc')
+        pypirc_config = config.from_pypirc('pypi')
         assert pypirc_config['username'] == 'someuser'

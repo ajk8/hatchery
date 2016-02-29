@@ -1,6 +1,6 @@
 import setuptools
 import os
-import pip
+import requests
 import logging
 import microcache
 import pypandoc
@@ -8,6 +8,7 @@ from pkg_resources.extern import packaging
 from . import helpers
 
 logger = logging.getLogger(__name__)
+logging.getLogger('requests').setLevel(logging.ERROR)
 
 
 class ProjectError(RuntimeError):
@@ -116,19 +117,49 @@ def version_is_valid(version_str):
     return True
 
 
+@microcache.this
+def _get_uploaded_versions(project_name, index_url):
+    """ Query the pypi index at index_url to find all of the "releases" """
+    url = '/'.join((index_url, project_name, 'json'))
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()['releases'].keys()
+    logger.debug('could not find evidence of project at {} (return code {})'.format(
+        url, response.status_code
+    ))
+    return []
+
+
 def version_already_uploaded(project_name, version_str, index_url):
     """ Check to see if the version specified has already been uploaded to the configured index
     """
+    all_versions = _get_uploaded_versions(project_name, index_url)
+    return version_str in all_versions
 
-    pf = pip.index.PackageFinder([], [index_url], session=pip.download.PipSession())
-    try:
-        req = pip.req.InstallRequirement(
-            '{}=={}'.format(project_name, version_str), comes_from=None
-        )
-        pf.find_requirement(req, upgrade=False)
-    except (pip.exceptions.DistributionNotFound, pip.exceptions.InstallationError):
+
+def get_latest_uploaded_version(project_name, index_url):
+    """ Grab the latest version of project_name according to index_url """
+    all_versions = _get_uploaded_versions(project_name, index_url)
+    ret = None
+    for uploaded_version in all_versions:
+        ret = ret or '0.0'
+        left, right = packaging.version.Version(uploaded_version), packaging.version.Version(ret)
+        if left > right:
+            ret = uploaded_version
+    return ret
+
+
+def version_is_latest(project_name, version_str, index_url):
+    """ Compare version_str with the latest (according to index_url) """
+    if version_already_uploaded(project_name, version_str, index_url):
         return False
-    return True
+    latest_uploaded_version = get_latest_uploaded_version(project_name, index_url)
+    if latest_uploaded_version is None:
+        return True
+    elif packaging.version.Version(version_str) > \
+            packaging.version.Version(latest_uploaded_version):
+        return True
+    return False
 
 
 def project_has_readme_md():

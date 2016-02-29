@@ -23,10 +23,10 @@ General options:
     -h, --help      print this help output and quit
     --log-level=LEVEL
                     one of (debug, info, error, critical) [default: info]
-    -s, --show-command-output
-                    show output of all subcommands, even if they succeed.
-                    output of failed commands will be shown irrespective of
-                    this setting
+    -s, --stream-command-output
+                    stream output of all subcommands as they are running.
+                    if not set, output will be captured and printed to the
+                    screen only on failed commands
     -r=VER, --release-version=VER
                     version to use when packaging and registering
                     Note: version will be inferred when uploading
@@ -64,7 +64,7 @@ workdir.options.path = '.hatchery.work'
 def _get_package_name_or_die():
     try:
         package_name = project.get_package_name()
-    except project.PackageError as e:
+    except project.ProjectError as e:
         logger.error(str(e))
         raise SystemExit(1)
     return package_name
@@ -93,12 +93,29 @@ def _valid_version_or_die(release_version):
         raise SystemExit(1)
 
 
-def _check_and_set_version(release_version, package_name):
+def _latest_version_or_die(release_version, project_name, pypi_repository):
+    pypirc_dict = config.from_pypirc(pypi_repository)
+    index_url = pypirc_dict['repository']
+    if project.version_already_uploaded(project_name, release_version, index_url):
+        logger.error('{}=={} already exists on index {}'.format(
+            project_name, release_version, index_url
+        ))
+        raise SystemExit(1)
+    elif not project.version_is_latest(project_name, release_version, index_url):
+        latest_version = project.get_latest_uploaded_version(project_name, index_url)
+        logger.error('{}=={} is older than the latest ({}) on index {}'.format(
+            project_name, release_version, latest_version, index_url
+        ))
+        raise SystemExit(1)
+
+
+def _check_and_set_version(release_version, package_name, project_name, pypi_repository):
     set_flag = True
     if not release_version:
         set_flag = False
         release_version = project.get_version(package_name)
     _valid_version_or_die(release_version)
+    _latest_version_or_die(release_version, project_name, pypi_repository)
     if set_flag:
         project.set_version(package_name, release_version)
     return release_version
@@ -113,7 +130,7 @@ def _log_failure_and_die(error_msg, call_result, log_full_result):
 
 
 def task_upload(args):
-    suppress_output = not args['--show-command-output']
+    suppress_output = not args['--stream-command-output']
     if not os.path.isdir(workdir.options.path):
         logger.error('{} does not exist, nothing to upload!'.format(workdir.options.path))
         raise SystemExit(1)
@@ -123,17 +140,11 @@ def task_upload(args):
             required_params=['pypi_repository']
         )
         pypi_repository = config_dict['pypi_repository']
-        pypirc_dict = config.from_pypirc(pypi_repository)
-        index_url = pypirc_dict['repository']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
         release_version = project.get_version(package_name, ignore_cache=True)
         _valid_version_or_die(release_version)
-        if project.version_already_uploaded(project_name, release_version, index_url):
-            logger.error('{}=={} already exists on index {}'.format(
-                project_name, release_version, index_url
-            ))
-            raise SystemExit(1)
+        _latest_version_or_die(release_version, project_name, pypi_repository)
         result = executor.call(
             ('twine', 'upload', '-r', pypi_repository, 'dist/*'), suppress_output=suppress_output
         )
@@ -145,11 +156,14 @@ def task_upload(args):
                     'failed to upload packages', result, log_full_result=suppress_output
                 )
             raise SystemExit(1)
+    logger.info('successfully uploaded {}=={} to [{}]'.format(
+        project_name, release_version, pypi_repository
+    ))
 
 
 def task_register(args):
     release_version = args['--release-version']
-    suppress_output = not args['--show-command-output']
+    suppress_output = not args['--stream-command-output']
     workdir.sync()
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
@@ -157,8 +171,9 @@ def task_register(args):
             required_params=['pypi_repository']
         )
         pypi_repository = config_dict['pypi_repository']
+        project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
-        _check_and_set_version(release_version, package_name)
+        _check_and_set_version(release_version, package_name, project_name, pypi_repository)
         result = executor.setup(
             ('register', '-r', pypi_repository), suppress_output=suppress_output
         )
@@ -166,19 +181,22 @@ def task_register(args):
             _log_failure_and_die(
                 'failed to register project', result, log_full_result=suppress_output
             )
+    logger.info('successfully registered {} with [{}]'.format(project_name, pypi_repository))
 
 
 def task_package(args):
     release_version = args['--release-version']
-    suppress_output = not args['--show-command-output']
+    suppress_output = not args['--stream-command-output']
     workdir.sync()
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
             calling_task='register',
-            required_params=['create_wheel', 'readme_to_rst']
+            required_params=['create_wheel', 'readme_to_rst', 'pypi_repository']
         )
+        pypi_repository = config_dict['pypi_repository']
+        project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
-        _check_and_set_version(release_version, package_name)
+        _check_and_set_version(release_version, package_name, project_name, pypi_repository)
         if config_dict['readme_to_rst']:
             if project.project_has_readme_md():
                 try:
@@ -197,10 +215,11 @@ def task_package(args):
             _log_failure_and_die(
                 'failed to package project', result, log_full_result=suppress_output
             )
+    logger.info('successfully packaged {}=={}'.format(project_name, release_version))
 
 
 def task_test(args):
-    suppress_output = not args['--show-command-output']
+    suppress_output = not args['--stream-command-output']
     workdir.sync()
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
@@ -214,6 +233,7 @@ def task_test(args):
             result = executor.call(cmd_str, suppress_output=suppress_output)
             if result.exitval:
                 _log_failure_and_die('tests failed', result, log_full_result=suppress_output)
+    logger.info('testing completed successfully')
 
 
 def task_clean(args):
@@ -223,15 +243,22 @@ def task_clean(args):
 
 def task_check(args):
     logger.info('checking project for requirements')
-    ret = 0
     logger.debug('verifying that project has a single package')
-    package_name = project.get_package_name()
+    try:
+        package_name = project.get_package_name()
+    except project.ProjectError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
+    ret = 0
     logger.debug('checking state of _version.py file')
-    if not project.package_has_version_file(package_name):
-        logger.error('package does not have a _version.py file')
-        ret = 1
-    elif not project.version_file_has___version__(package_name):
-        logger.error('package has a _version.py file but does not define a __version__ variable')
+    if (not project.package_has_version_file(package_name) or
+            not project.version_file_has___version__(package_name)):
+        _version_py_block = snippets.get_snippet_content('_version.py', package_name=package_name)
+        logger.error(os.linesep.join((
+            'package does not have a valid _version.py file',
+            '',
+            _version_py_block
+        )))
         ret = 1
     logger.debug('checking state of setup.py')
     if not project.setup_py_uses__version_py() or not project.setup_py_uses___version__():
@@ -244,8 +271,7 @@ def task_check(args):
         ret = 1
     if ret:
         raise SystemExit(ret)
-    else:
-        logger.info('everything looks good!')
+    logger.info('everything looks good!')
 
 
 ORDERED_TASKS = ['check', 'clean', 'test', 'package', 'register', 'upload']
@@ -266,6 +292,8 @@ def hatchery():
     try:
         level_const = getattr(logging, level_str.upper())
         logging.basicConfig(level=level_const)
+        if level_const == logging.DEBUG:
+            workdir.options.debug = True
     except LookupError:
         logging.basicConfig()
         logger.error('received invalid log level: ' + level_str)

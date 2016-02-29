@@ -45,13 +45,10 @@ def from_yaml():
 
 
 @microcache.this
-def from_pypirc(pypi_repository, _pypirc_location_for_testing=None):
+def from_pypirc(pypi_repository):
     """ Load configuration from .pypirc file, cached to only run once """
     ret = {}
-    if _pypirc_location_for_testing is not None:
-        pypirc_locations = [_pypirc_location_for_testing]
-    else:
-        pypirc_locations = PYPIRC_LOCATIONS
+    pypirc_locations = PYPIRC_LOCATIONS
     for pypirc_path in pypirc_locations:
         pypirc_path = os.path.expanduser(pypirc_path)
         if os.path.isfile(pypirc_path):

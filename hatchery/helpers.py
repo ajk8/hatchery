@@ -57,17 +57,13 @@ def value_of_named_argument_in_function(argument_name, function_name, search_str
 
     # this is very dumb logic, and only works if the function argument is set to a variable
     # which is set to a string value
-    if is_var and resolve_varname:
+    if is_var:
         for i in range(len(tokens)):
             if (
                 tokens[i].typenum == tokenize.NAME and tokens[i].value == argument_name and
                 tokens[i+1].typenum == tokenize.OP and tokens[i+1].value == '='
             ):
                 return tokens[i+2].value
-
-    # return the argument if not asked to resolve further
-    elif is_var:
-        return argument_name
 
     return None
 

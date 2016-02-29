@@ -21,7 +21,7 @@ setup(
 
 from imp import find_module, load_module
 
-found = find_module('_version', ['{package_name}''])
+found = find_module('_version', ['{package_name}'])
 _version = load_module('_version', *found)
 
 setup(
