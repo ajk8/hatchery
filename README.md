@@ -1,5 +1,8 @@
 # hatchery
 
+[![Latest Version](https://img.shields.io/pypi/v/hatchery.svg)](https://pypi.python.org/pypi/hatchery)
+[![Build Status](https://travis-ci.org/ajk8/hatchery.svg?branch=master)](https://travis-ci.org/ajk8/hatchery)
+
 A helper for continuous delivery of python packages
 
 ## What is the problem, exactly?
