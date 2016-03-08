@@ -53,7 +53,7 @@ def value_of_named_argument_in_function(argument_name, function_name, search_str
                     break
                 j += 1
 
-            return ''.join([t.value for t in tokens[i+2:i+j]])
+            return ''.join([t.value for t in tokens[i+2:i+j]]).strip()
 
     # this is very dumb logic, and only works if the function argument is set to a variable
     # which is set to a string value
@@ -63,7 +63,7 @@ def value_of_named_argument_in_function(argument_name, function_name, search_str
                 tokens[i].typenum == tokenize.NAME and tokens[i].value == argument_name and
                 tokens[i+1].typenum == tokenize.OP and tokens[i+1].value == '='
             ):
-                return tokens[i+2].value
+                return tokens[i+2].value.strip()
 
     return None
 
