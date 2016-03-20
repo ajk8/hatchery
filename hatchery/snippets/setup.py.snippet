@@ -11,7 +11,7 @@ with open('{package_name}/_version.py') as f:
     exec(f.read())
 
 setup(
-    name={package_name},
+    name='{package_name}',
     version=__version__
 )
 
@@ -25,6 +25,6 @@ found = find_module('_version', ['{package_name}'])
 _version = load_module('_version', *found)
 
 setup(
-    name={package_name},
+    name='{package_name}',
     version=_version.__version__
 )
