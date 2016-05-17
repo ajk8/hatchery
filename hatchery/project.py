@@ -4,6 +4,7 @@ import requests
 import logging
 import microcache
 import pypandoc
+import funcy
 from pkg_resources.extern import packaging
 from . import helpers
 
@@ -198,3 +199,14 @@ def convert_readme_to_rst():
                     'could not convert readme to rst due to pypandoc error:' + os.linesep + str(e)
                 )
     raise ProjectError('could not find any README.md file to convert')
+
+
+def multiple_packaged_versions(package_name):
+    """ Look through built package directory and see if there are multiple versions there """
+    dist_files = os.listdir('dist')
+    versions = set()
+    for filename in dist_files:
+        version = funcy.re_find(r'{}-(.+).tar.gz'.format(package_name), filename)
+        if version:
+            versions.add(version)
+    return len(versions) > 1

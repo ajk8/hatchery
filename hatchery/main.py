@@ -188,6 +188,11 @@ def task_upload(args):
         pypi_repository = config_dict['pypi_repository']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
+        if project.multiple_packaged_versions(package_name):
+            logger.error(
+                'multiple package versions found, refusing to upload -- run `hatchery clean`'
+            )
+            raise SystemExit(1)
         release_version = project.get_version(package_name, ignore_cache=True)
         _valid_version_or_die(release_version)
         _latest_version_or_die(release_version, project_name, pypi_repository)

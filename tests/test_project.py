@@ -184,7 +184,6 @@ def test_project_has_readme_md(tmpdir):
         assert project.project_has_readme_md() is True
 
 
-
 def test_convert_readme_to_rst(tmpdir):
 
     def _mock_pypandoc_convert_OSError(filename, format):
@@ -209,3 +208,12 @@ def test_convert_readme_to_rst(tmpdir):
         with mock.patch('pypandoc.convert', _mock_pypandoc_convert_OSError):
             with pytest.raises(project.ProjectError):
                 project.convert_readme_to_rst()
+
+
+def test_multiple_packaged_versions(tmpdir):
+    with tmpdir.as_cwd():
+        os.mkdir('dist')
+        open(os.path.join('dist', 'package-ver.s.ion+1.tar.gz'), 'w').close()
+        assert not project.multiple_packaged_versions('package')
+        open(os.path.join('dist', 'package-ver.s.ion+2.tar.gz'), 'w').close()
+        assert project.multiple_packaged_versions('package')
