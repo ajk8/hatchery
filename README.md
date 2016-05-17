@@ -2,6 +2,7 @@
 
 [![Latest Version](https://img.shields.io/pypi/v/hatchery.svg)](https://pypi.python.org/pypi/hatchery)
 [![Build Status](https://travis-ci.org/ajk8/hatchery.svg?branch=master)](https://travis-ci.org/ajk8/hatchery)
+[![Coverage Status](https://coveralls.io/repos/github/ajk8/hatchery/badge.svg?branch=master)](https://coveralls.io/github/ajk8/hatchery?branch=master)
 
 A helper for continuous delivery of python packages
 
