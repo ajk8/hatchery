@@ -39,6 +39,8 @@ class CallRequest(object):
         self.suppress_output = suppress_output
         self.stdout_queue = Queue()
         self.stderr_queue = Queue()
+        self.stdout_str = ''
+        self.stderr_str = ''
         self.process = None
 
     def _enqueue_output(self):
@@ -66,6 +68,16 @@ class CallRequest(object):
             err = b''
         return out.decode(), err.decode()
 
+    def _process_output(self):
+        out, err = self._dequeue_output()
+        if not self.suppress_output:
+            sys.stdout.write(out)
+            sys.stdout.flush()
+            sys.stderr.write(err)
+            sys.stderr.flush()
+        self.stdout_str += out
+        self.stderr_str += err
+
     def run(self):
         self.process = subprocess.Popen(
             self.cmd_args,
@@ -76,21 +88,13 @@ class CallRequest(object):
         thread = threading.Thread(target=self._enqueue_output)
         thread.daemon = True
         thread.start()
-
-        out = err = ''
         while True:
-            _out, _err = self._dequeue_output()
-            if not self.suppress_output:
-                sys.stdout.write(_out)
-                sys.stdout.flush()
-                sys.stderr.write(_err)
-                sys.stderr.flush()
-            out += _out
-            err += _err
-            if not _out and not _err and self.process.poll() is not None:
+            self._process_output()
+            if self.process.poll() is not None:
+                self._process_output()
                 break
 
-        return CallResult(self.process.returncode, out, err)
+        return CallResult(self.process.returncode, self.stdout_str, self.stderr_str)
 
 
 def call(cmd_args, suppress_output=False):

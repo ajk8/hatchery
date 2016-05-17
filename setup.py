@@ -6,7 +6,7 @@ GITHUB_USER = 'ajk8'
 GITHUB_ROOT = 'https://github.com/{}/{}'.format(GITHUB_USER, PROJECT_NAME)
 
 found = find_module('_version', [PROJECT_NAME])
-_version = load_module('_version', *found)
+_version = load_module('{}._version'.format(PROJECT_NAME), *found)
 
 setup(
     name=PROJECT_NAME,
