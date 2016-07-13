@@ -74,6 +74,7 @@ from . import snippets
 
 logger = logging.getLogger(__name__)
 workdir.options.path = '.hatchery.work'
+workdir.options.sync_exclude_regex_list = [r'\.hatchery\.work']
 
 
 def _get_package_name_or_die():
