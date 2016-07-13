@@ -118,29 +118,53 @@ def version_is_valid(version_str):
     return True
 
 
-@microcache.this
-def _get_uploaded_versions(project_name, index_url):
-    """ Query the pypi index at index_url to find all of the "releases" """
+def _get_uploaded_versions_warehouse(project_name, index_url, requests_verify=True):
+    """ Query the pypi index at index_url using warehouse api to find all of the "releases" """
     url = '/'.join((index_url, project_name, 'json'))
-    response = requests.get(url)
+    response = requests.get(url, verify=requests_verify)
     if response.status_code == 200:
         return response.json()['releases'].keys()
-    logger.debug('could not find evidence of project at {} (return code {})'.format(
-        url, response.status_code
-    ))
+    return None
+
+
+def _get_uploaded_versions_pypicloud(project_name, index_url, requests_verify=True):
+    """ Query the pypi index at index_url using pypicloud api to find all versions """
+    api_url = index_url
+    for suffix in ('/pypi', '/pypi/', '/simple', '/simple/'):
+        if api_url.endswith(suffix):
+            api_url = api_url[:len(suffix) * -1] + '/api/package'
+            break
+    url = '/'.join((api_url, project_name))
+    response = requests.get(url, verify=requests_verify)
+    if response.status_code == 200:
+        return [p['version'] for p in response.json()['packages']]
+    return None
+
+
+@microcache.this
+def _get_uploaded_versions(project_name, index_url, requests_verify=True):
+    server_types = ('warehouse', 'pypicloud')
+    for server_type in server_types:
+        get_method = globals()['_get_uploaded_versions_' + server_type]
+        versions = get_method(project_name, index_url, requests_verify)
+        if versions is not None:
+            logger.debug('detected pypi server: ' + server_type)
+            return versions
+    logger.debug('could not find evidence of project at {}, tried server types {}'.format(
+        index_url, server_types))
     return []
 
 
-def version_already_uploaded(project_name, version_str, index_url):
+def version_already_uploaded(project_name, version_str, index_url, requests_verify=True):
     """ Check to see if the version specified has already been uploaded to the configured index
     """
-    all_versions = _get_uploaded_versions(project_name, index_url)
+    all_versions = _get_uploaded_versions(project_name, index_url, requests_verify)
     return version_str in all_versions
 
 
-def get_latest_uploaded_version(project_name, index_url):
+def get_latest_uploaded_version(project_name, index_url, requests_verify=True):
     """ Grab the latest version of project_name according to index_url """
-    all_versions = _get_uploaded_versions(project_name, index_url)
+    all_versions = _get_uploaded_versions(project_name, index_url, requests_verify)
     ret = None
     for uploaded_version in all_versions:
         ret = ret or '0.0'
@@ -150,11 +174,11 @@ def get_latest_uploaded_version(project_name, index_url):
     return ret
 
 
-def version_is_latest(project_name, version_str, index_url):
+def version_is_latest(project_name, version_str, index_url, requests_verify=True):
     """ Compare version_str with the latest (according to index_url) """
-    if version_already_uploaded(project_name, version_str, index_url):
+    if version_already_uploaded(project_name, version_str, index_url, requests_verify):
         return False
-    latest_uploaded_version = get_latest_uploaded_version(project_name, index_url)
+    latest_uploaded_version = get_latest_uploaded_version(project_name, index_url, requests_verify)
     if latest_uploaded_version is None:
         return True
     elif packaging.version.Version(version_str) > \

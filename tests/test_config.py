@@ -29,10 +29,17 @@ def test_from_yaml(tmpdir, monkeypatch):
 
 
 PYPIRC_DATA = '''
+[distutils]
+index-servers:
+    pypi
+
 [pypi]
 repository: https://pypi.python.org/pypi
 username: someuser
 password: somepass
+
+[notindistutils]
+repository: doesnotmatter
 '''
 
 
@@ -41,7 +48,8 @@ def test_from_pypirc(tmpdir, monkeypatch):
     with tmpdir.as_cwd():
         with open('.pypirc', 'w') as pypirc_file:
             pypirc_file.write(PYPIRC_DATA)
-        pypirc_config = config.from_pypirc('notthere')
-        assert pypirc_config == {}
+        for badindex in ['notindistutils', 'notanywhere']:
+            with pytest.raises(config.ConfigError):
+                pypirc_config = config.from_pypirc(badindex)
         pypirc_config = config.from_pypirc('pypi')
         assert pypirc_config['username'] == 'someuser'

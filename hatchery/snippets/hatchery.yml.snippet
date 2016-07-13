@@ -13,6 +13,11 @@ git_remote_name: origin
 # see https://docs.python.org/3.5/distutils/packageindex.html#the-pypirc-file
 pypi_repository: null
 
+# to verify ssl certs for a private pypi instance, set this parameter to an absolute path to
+# a server cert in .pem format
+# if set to false, verification of custom certs will be disabled
+pypi_verify_ssl: true
+
 # convert README.md to README.rst on the fly
 readme_to_rst: true
 

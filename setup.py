@@ -29,7 +29,8 @@ setup(
         'twine>=1.6.5',
         'microcache>=0.2',
         'workdir>=0.3.1',
-        'gitpython>=1.0.2'
+        'gitpython>=1.0.2',
+        'requests>=2.10.0'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
