@@ -18,13 +18,18 @@ class ProjectError(RuntimeError):
 
 def get_package_name():
     packages = setuptools.find_packages()
-    if 'tests' in packages:
-        packages.remove('tests')
-    if len(packages) < 1:
+    build_package = None
+    for package_name in packages:
+        root_package = package_name.split('.')[0]
+        if not build_package and root_package != 'tests':
+            build_package = root_package
+            continue
+        if root_package not in ['tests', build_package]:
+            raise ProjectError('detected too many top-level packages...something is amiss: ' +
+                               str(packages))
+    if not build_package:
         raise ProjectError('could not detect any packages to build!')
-    elif len(packages) > 1:
-        raise ProjectError('detected too many packages...something is amiss: ' + str(packages))
-    return packages[0]
+    return build_package
 
 
 def project_has_setup_py():

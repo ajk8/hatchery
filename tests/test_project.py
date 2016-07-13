@@ -27,21 +27,27 @@ def teardown_module(module):
 
 
 def _make_package(package_name, empty_module_files=[]):
-    os.mkdir(package_name)
-    open(os.path.join(package_name, '__init__.py'), 'w').close()
+    package_path = package_name.replace('.', '/')
+    os.makedirs(package_path)
+    open(os.path.join(package_path, '__init__.py'), 'w').close()
     for module_file in empty_module_files:
-        open(os.path.join(package_name, module_file), 'w').close()
+        open(os.path.join(package_path, module_file), 'w').close()
 
 
 def test_get_package_name(tmpdir):
     with tmpdir.as_cwd():
         with pytest.raises(project.ProjectError):
             project.get_package_name()
+        _make_package('tests')
+        with pytest.raises(project.ProjectError):
+            project.get_package_name()
         _make_package('package_name')
         assert project.get_package_name() == 'package_name'
-        _make_package('tests')
+        _make_package('package_name.subpackage')
         assert project.get_package_name() == 'package_name'
-        _make_package('not_tests')
+        _make_package('tests.subtests')
+        assert project.get_package_name() == 'package_name'
+        _make_package('another_root_package')
         with pytest.raises(project.ProjectError):
             project.get_package_name()
 
