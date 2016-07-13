@@ -108,29 +108,32 @@ def _valid_version_or_die(release_version):
         raise SystemExit(1)
 
 
-def _latest_version_or_die(release_version, project_name, pypi_repository):
+def _latest_version_or_die(release_version, project_name, pypi_repository, pypi_verify_ssl):
     pypirc_dict = config.from_pypirc(pypi_repository)
     index_url = pypirc_dict['repository']
-    if project.version_already_uploaded(project_name, release_version, index_url):
+    if project.version_already_uploaded(project_name, release_version, index_url, pypi_verify_ssl):
         logger.error('{}=={} already exists on index {}'.format(
             project_name, release_version, index_url
         ))
         raise SystemExit(1)
-    elif not project.version_is_latest(project_name, release_version, index_url):
-        latest_version = project.get_latest_uploaded_version(project_name, index_url)
+    elif not project.version_is_latest(project_name, release_version, index_url, pypi_verify_ssl):
+        latest_version = project.get_latest_uploaded_version(
+            project_name, index_url, pypi_verify_ssl
+        )
         logger.error('{}=={} is older than the latest ({}) on index {}'.format(
             project_name, release_version, latest_version, index_url
         ))
         raise SystemExit(1)
 
 
-def _check_and_set_version(release_version, package_name, project_name, pypi_repository):
+def _check_and_set_version(release_version, package_name, project_name,
+                           pypi_repository, pypi_verify_ssl):
     set_flag = True
     if not release_version:
         set_flag = False
         release_version = project.get_version(package_name)
     _valid_version_or_die(release_version)
-    _latest_version_or_die(release_version, project_name, pypi_repository)
+    _latest_version_or_die(release_version, project_name, pypi_repository, pypi_verify_ssl)
     if set_flag:
         project.set_version(package_name, release_version)
     return release_version
@@ -183,9 +186,10 @@ def task_upload(args):
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
             calling_task='upload',
-            required_params=['pypi_repository']
+            required_params=['pypi_repository', 'pypi_verify_ssl']
         )
         pypi_repository = config_dict['pypi_repository']
+        pypi_verify_ssl = config_dict['pypi_verify_ssl']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
         if project.multiple_packaged_versions(package_name):
@@ -195,7 +199,7 @@ def task_upload(args):
             raise SystemExit(1)
         release_version = project.get_version(package_name, ignore_cache=True)
         _valid_version_or_die(release_version)
-        _latest_version_or_die(release_version, project_name, pypi_repository)
+        _latest_version_or_die(release_version, project_name, pypi_repository, pypi_verify_ssl)
         result = executor.call(
             ('twine', 'upload', '-r', pypi_repository, 'dist/*'), suppress_output=suppress_output
         )
@@ -219,9 +223,10 @@ def task_register(args):
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
             calling_task='register',
-            required_params=['pypi_repository']
+            required_params=['pypi_repository', 'pypi_verify_ssl']
         )
         pypi_repository = config_dict['pypi_repository']
+        pypi_verify_ssl = config_dict['pypi_verify_ssl']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
         if not release_version:
@@ -229,7 +234,9 @@ def task_register(args):
             if not project.version_is_valid(release_version):
                 logger.info('using version 0.0 for registration purposes')
                 release_version = '0.0'
-        _check_and_set_version(release_version, package_name, project_name, pypi_repository)
+        _check_and_set_version(
+            release_version, package_name, project_name, pypi_repository, pypi_verify_ssl
+        )
         result = executor.setup(
             ('register', '-r', pypi_repository), suppress_output=suppress_output
         )
@@ -247,12 +254,15 @@ def task_package(args):
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
             calling_task='register',
-            required_params=['create_wheel', 'readme_to_rst', 'pypi_repository']
+            required_params=['create_wheel', 'readme_to_rst', 'pypi_repository', 'pypi_verify_ssl']
         )
         pypi_repository = config_dict['pypi_repository']
+        pypi_verify_ssl = config_dict['pypi_verify_ssl']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
-        _check_and_set_version(release_version, package_name, project_name, pypi_repository)
+        _check_and_set_version(
+            release_version, package_name, project_name, pypi_repository, pypi_verify_ssl
+        )
         if config_dict['readme_to_rst']:
             if project.project_has_readme_md():
                 try:

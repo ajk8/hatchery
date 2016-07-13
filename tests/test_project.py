@@ -1,9 +1,9 @@
 import pytest
 import os
 import funcy
-import pip
 import microcache
 import requests_mock
+import pypandoc
 from hatchery import project
 from hatchery import snippets
 from hatchery import helpers
@@ -135,43 +135,59 @@ def test_set_version(tmpdir):
         assert found['version'] == '1.2.3'
 
 
-def test__get_uploaded_versions():
+def test__get_uploaded_versions_warehouse():
     api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
     with requests_mock.mock() as m:
         m.get(api_url, status_code=404)
-        assert project._get_uploaded_versions(PROJECT_NAME, INDEX_URL) == []
+        assert project._get_uploaded_versions_warehouse(PROJECT_NAME, INDEX_URL) is None
         m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
-        assert set(project._get_uploaded_versions(PROJECT_NAME, INDEX_URL)) == set(['0.1', '0.2'])
+        assert set(project._get_uploaded_versions_warehouse(PROJECT_NAME, INDEX_URL)) == \
+            set(['0.1', '0.2'])
 
 
-def test_version_already_uploaded():
-    api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
+def test__get_upload_versions_pypicloud():
+    api_url = '/'.join((INDEX_URL.replace('/pypi', '/api/package'), PROJECT_NAME))
     with requests_mock.mock() as m:
         m.get(api_url, status_code=404)
-        assert project.version_already_uploaded(PROJECT_NAME, '0.1', INDEX_URL) is False
-        m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
-        assert project.version_already_uploaded(PROJECT_NAME, '0.1', INDEX_URL) is True
-        assert project.version_already_uploaded(PROJECT_NAME, '0.3', INDEX_URL) is False
+        assert project._get_uploaded_versions_pypicloud(PROJECT_NAME, INDEX_URL) is None
+        m.get(api_url, text='{"packages": [{"version": "0.1"}, {"version": "0.2"}]}')
+        assert set(project._get_uploaded_versions_pypicloud(PROJECT_NAME, INDEX_URL)) == \
+            set(['0.1', '0.2'])
 
 
-def test_get_latest_uploaded_version():
-    api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
-    with requests_mock.mock() as m:
-        m.get(api_url, status_code=404)
-        assert project.get_latest_uploaded_version(PROJECT_NAME, INDEX_URL) is None
-        m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
-        assert project.get_latest_uploaded_version(PROJECT_NAME, INDEX_URL) == '0.2'
+def test__get_uploaded_versions(monkeypatch):
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: None)
+    monkeypatch.setattr(project, '_get_uploaded_versions_pypicloud', lambda a, b, c: None)
+    assert project._get_uploaded_versions(PROJECT_NAME, INDEX_URL) == []
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: ['0.1', '0.2'])
+    assert set(project._get_uploaded_versions(PROJECT_NAME, INDEX_URL)) == set(['0.1', '0.2'])
 
 
-def test_version_is_latest():
-    api_url = '/'.join((INDEX_URL, PROJECT_NAME, 'json'))
-    with requests_mock.mock() as m:
-        m.get(api_url, status_code=404)
-        assert project.version_is_latest(PROJECT_NAME, '0.1', INDEX_URL)
-        m.get(api_url, text='{"releases": {"0.1": [], "0.2": []}}')
-        assert project.version_is_latest(PROJECT_NAME, '0.1.5', INDEX_URL) is False
-        assert project.version_is_latest(PROJECT_NAME, '0.2', INDEX_URL) is False
-        assert project.version_is_latest(PROJECT_NAME, '0.3', INDEX_URL) is True
+def test_version_already_uploaded(monkeypatch):
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: None)
+    monkeypatch.setattr(project, '_get_uploaded_versions_pypicloud', lambda a, b, c: None)
+    assert project.version_already_uploaded(PROJECT_NAME, '0.1', INDEX_URL) is False
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: ['0.1', '0.2'])
+    assert project.version_already_uploaded(PROJECT_NAME, '0.1', INDEX_URL) is True
+    assert project.version_already_uploaded(PROJECT_NAME, '0.3', INDEX_URL) is False
+
+
+def test_get_latest_uploaded_version(monkeypatch):
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: None)
+    monkeypatch.setattr(project, '_get_uploaded_versions_pypicloud', lambda a, b, c: None)
+    assert project.get_latest_uploaded_version(PROJECT_NAME, INDEX_URL) is None
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: ['0.1', '0.2'])
+    assert project.get_latest_uploaded_version(PROJECT_NAME, INDEX_URL) == '0.2'
+
+
+def test_version_is_latest(monkeypatch):
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: None)
+    monkeypatch.setattr(project, '_get_uploaded_versions_pypicloud', lambda a, b, c: None)
+    assert project.version_is_latest(PROJECT_NAME, '0.1', INDEX_URL) is True
+    monkeypatch.setattr(project, '_get_uploaded_versions_warehouse', lambda a, b, c: ['0.1', '0.2'])
+    assert project.version_is_latest(PROJECT_NAME, '0.1.5', INDEX_URL) is False
+    assert project.version_is_latest(PROJECT_NAME, '0.2', INDEX_URL) is False
+    assert project.version_is_latest(PROJECT_NAME, '0.3', INDEX_URL) is True
 
 
 def test_project_has_readme_md(tmpdir):
@@ -184,6 +200,15 @@ def test_project_has_readme_md(tmpdir):
         assert project.project_has_readme_md() is True
 
 
+def _pandoc_installed():
+    try:
+        pypandoc.get_pandoc_path()
+    except OSError:
+        return False
+    return True
+
+
+@pytest.mark.skipif(not _pandoc_installed(), reason='pandoc is not installed')
 def test_convert_readme_to_rst(tmpdir):
 
     def _mock_pypandoc_convert_OSError(filename, format):
