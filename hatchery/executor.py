@@ -51,7 +51,7 @@ class CallRequest(object):
             (self.process.stderr, self.stderr_queue)
         ):
             while True:
-                chunk = stream.read(1)
+                chunk = stream.read(2)
                 if not chunk:
                     break
                 q.put(chunk)
