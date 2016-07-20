@@ -30,7 +30,8 @@ setup(
         'microcache>=0.2',
         'workdir>=0.3.1',
         'gitpython>=1.0.2',
-        'requests>=2.10.0'
+        'requests>=2.10.0',
+        'six>=1.10.0'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
