@@ -36,6 +36,18 @@ class CallRequest(object):
         self.stderr_str = ''
         self.process = None
 
+    def _set_stream_process(self, stream_name):
+        # this is magic...the behavior suggests that the code inside this with block
+        # is assigned to events on self.process.stdout like a lambda function
+        with getattr(self.process, stream_name):
+            for line in iter(getattr(self.process, stream_name).readline, b''):
+                if six.PY3:
+                    line = line.decode()
+                if not self.suppress_output:
+                    getattr(sys, stream_name).write(line)
+                    getattr(sys, stream_name).flush()
+                setattr(self, stream_name + '_str', getattr(self, stream_name + '_str') + line)
+
     def run(self):
         self.process = subprocess.Popen(
             self.cmd_args,
@@ -44,26 +56,10 @@ class CallRequest(object):
             close_fds='posix' in sys.builtin_module_names,
             bufsize=1
         )
-
-        # this is magic...the behavior suggests that the code inside this with block
-        # is assigned to events on self.process.stdout like a lambda function
-        with self.process.stdout:
-            for line in iter(self.process.stdout.readline, b''):
-                if six.PY3:
-                    line = line.decode()
-                if not self.suppress_output:
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
-                self.stdout_str += line
-        with self.process.stderr:
-            for line in iter(self.process.stderr.readline, b''):
-                if six.PY3:
-                    line = line.decode()
-                if not self.suppress_output:
-                    sys.stderr.write(line)
-                    sys.stderr.flush()
-                self.stderr_str += line
+        self._set_stream_process('stdout')
+        self._set_stream_process('stderr')
         self.process.wait()
+
         return CallResult(self.process.returncode, self.stdout_str, self.stderr_str)
 
 
