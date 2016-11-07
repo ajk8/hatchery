@@ -17,13 +17,15 @@ def test__get_package_name_or_die(tmpdir):
         assert main._get_package_name_or_die() == 'somepackage'
 
 
-def test__get_config_or_die(tmpdir):
+def test__get_config_or_die(tmpdir, monkeypatch):
     with microcache.temporarily_disabled():
         with tmpdir.as_cwd():
             main._get_config_or_die()
             with pytest.raises(SystemExit):
                 main._get_config_or_die(['notarealparam'])
-            open('.hatchery.yml', 'w').write('notarealparam: "but valid yaml"\n')
+            with open('.hatchery.yml', 'w') as fh:
+                fh.write('notarealparam: "but valid yaml"\n')
+                fh.flush()
             with pytest.raises(SystemExit):
                 main._get_config_or_die()
 
