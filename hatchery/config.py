@@ -1,5 +1,6 @@
 import os
 import microcache
+import tempfile
 import ruamel.yaml as yaml
 from . import snippets
 
@@ -67,3 +68,26 @@ def from_pypirc(pypi_repository):
             ', remember that it needs an entry in [distutils] and its own section'
         )
     return ret
+
+
+PYPIRC_TEMP_INDEX_NAME = 'hatchery_tmp'
+PYPIRC_TEMPLATE = '''
+[distutils]
+index-servers =
+    {index_name}
+
+[{index_name}]
+repository = {index_url}
+username = anonymous
+password = nopassword
+'''
+
+
+@microcache.this
+def pypirc_temp(index_url):
+    """ Create a temporary pypirc file for interaction with twine """
+    pypirc_file = tempfile.NamedTemporaryFile(suffix='.pypirc', delete=False)
+    print(pypirc_file.name)
+    with open(pypirc_file.name, 'w') as fh:
+        fh.write(PYPIRC_TEMPLATE.format(index_name=PYPIRC_TEMP_INDEX_NAME, index_url=index_url))
+    return pypirc_file.name

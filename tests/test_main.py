@@ -68,16 +68,16 @@ def _nowhere_in_messages(messages, search_str):
     return not _somewhere_in_messages(messages, search_str)
 
 
-@testfixtures.log_capture()
-def test__log_failure_and_die(lc):
-    cr = executor.CallResult(1, 'happy_stdout', 'sad_stderr')
-    with pytest.raises(SystemExit):
-        main._log_failure_and_die('error', cr, False)
-    assert _somewhere_in_messages(lc, 'error')
-    assert _nowhere_in_messages(lc, 'happy_stdout')
-    assert _nowhere_in_messages(lc, 'sad_stderr')
-    with pytest.raises(SystemExit):
-        main._log_failure_and_die('error', cr, True)
-    assert _somewhere_in_messages(lc, 'error')
-    assert _somewhere_in_messages(lc, 'happy_stdout')
-    assert _somewhere_in_messages(lc, 'sad_stderr')
+def test__log_failure_and_die():
+    with testfixtures.LogCapture() as lc:
+        cr = executor.CallResult(1, 'happy_stdout', 'sad_stderr')
+        with pytest.raises(SystemExit):
+            main._log_failure_and_die('error', cr, False)
+        assert _somewhere_in_messages(lc, 'error')
+        assert _nowhere_in_messages(lc, 'happy_stdout')
+        assert _nowhere_in_messages(lc, 'sad_stderr')
+        with pytest.raises(SystemExit):
+            main._log_failure_and_die('error', cr, True)
+        assert _somewhere_in_messages(lc, 'error')
+        assert _somewhere_in_messages(lc, 'happy_stdout')
+        assert _somewhere_in_messages(lc, 'sad_stderr')

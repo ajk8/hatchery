@@ -53,3 +53,14 @@ def test_from_pypirc(tmpdir, monkeypatch):
                 pypirc_config = config.from_pypirc(badindex)
         pypirc_config = config.from_pypirc('pypi')
         assert pypirc_config['username'] == 'someuser'
+
+
+def test_pypirc_temp():
+    with microcache.temporarily_disabled():
+        temp_file = config.pypirc_temp('somelocation')
+        with open(temp_file) as fh:
+            contents = fh.read()
+        assert 'somelocation' in contents
+        assert 'anonymous' in contents
+        os.remove(temp_file)
+

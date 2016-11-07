@@ -71,6 +71,7 @@ from . import executor
 from . import project
 from . import config
 from . import snippets
+from . import helpers
 
 logger = logging.getLogger(__name__)
 workdir.options.path = '.hatchery.work'
@@ -92,9 +93,8 @@ def _get_config_or_die(required_params=[], calling_task=None):
         for key in required_params:
             if key not in config_dict.keys() or config_dict[key] is None:
                 logger.error(
-                    '{} was not set in hatchery config files, cannot continue with {}'.format(
-                        key, calling_task
-                    )
+                    '"{}" was not set in hatchery config files, '
+                    'cannot continue with task: {}'.format(key, calling_task)
                 )
                 raise SystemExit(1)
     except config.ConfigError as e:
@@ -110,8 +110,11 @@ def _valid_version_or_die(release_version):
 
 
 def _latest_version_or_die(release_version, project_name, pypi_repository, pypi_verify_ssl):
-    pypirc_dict = config.from_pypirc(pypi_repository)
-    index_url = pypirc_dict['repository']
+    if helpers.string_is_url(pypi_repository):
+        index_url = pypi_repository
+    else:
+        pypirc_dict = config.from_pypirc(pypi_repository)
+        index_url = pypirc_dict['repository']
     if project.version_already_uploaded(project_name, release_version, index_url, pypi_verify_ssl):
         logger.error('{}=={} already exists on index {}'.format(
             project_name, release_version, index_url
@@ -179,6 +182,17 @@ def task_tag(args):
     logger.info('version {} tagged and pushed!'.format(release_version))
 
 
+def _call_twine(args, pypi_repository, suppress_output):
+    twine_args = ['twine'] + list(args)
+    if helpers.string_is_url(pypi_repository):
+        pypirc_path = config.pypirc_temp(pypi_repository)
+        pypirc_index_name = config.PYPIRC_TEMP_INDEX_NAME
+        twine_args += ['-r', pypirc_index_name, '--config-file', pypirc_path]
+    else:
+        twine_args += ['-r', pypi_repository]
+    return executor.call(twine_args, suppress_output=suppress_output)
+
+
 def task_upload(args):
     suppress_output = not args['--stream-command-output']
     if not os.path.isdir(workdir.options.path):
@@ -201,9 +215,7 @@ def task_upload(args):
         release_version = project.get_version(package_name, ignore_cache=True)
         _valid_version_or_die(release_version)
         _latest_version_or_die(release_version, project_name, pypi_repository, pypi_verify_ssl)
-        result = executor.call(
-            ('twine', 'upload', '-r', pypi_repository, 'dist/*'), suppress_output=suppress_output
-        )
+        result = _call_twine(['upload', 'dist/*'], pypi_repository, suppress_output)
         if result.exitval:
             if 'not allowed to edit' in result.stderr:
                 logger.error('could not upload packages, try `hatchery register`')
@@ -238,9 +250,7 @@ def task_register(args):
         _check_and_set_version(
             release_version, package_name, project_name, pypi_repository, pypi_verify_ssl
         )
-        result = executor.setup(
-            ('register', '-r', pypi_repository), suppress_output=suppress_output
-        )
+        result = _call_twine(['register'], pypi_repository, suppress_output)
         if result.exitval or '(400)' in result.stdout:
             _log_failure_and_die(
                 'failed to register project', result, log_full_result=suppress_output
@@ -254,7 +264,7 @@ def task_package(args):
     workdir.sync()
     with workdir.as_cwd():
         config_dict = _get_config_or_die(
-            calling_task='register',
+            calling_task='package',
             required_params=['create_wheel', 'readme_to_rst', 'pypi_repository', 'pypi_verify_ssl']
         )
         pypi_repository = config_dict['pypi_repository']

@@ -5,6 +5,11 @@ import funcy
 import microcache
 from io import StringIO
 
+try:
+    from urllib import parse as urlparse
+except ImportError:
+    import urlparse
+
 SimplifiedToken = collections.namedtuple('SimplifiedToken', ('typenum', 'value'))
 
 
@@ -105,3 +110,17 @@ def regex_in_package_file(regex, filename, package_name, return_match=False):
     """
     filepath = package_file_path(filename, package_name)
     return regex_in_file(regex, filepath, return_match=return_match)
+
+
+@microcache.this
+def string_is_url(test_str):
+    """ Test to see if a string is a URL or not, defined in this case as a string for which
+    urlparse returns a scheme component
+
+    >>> string_is_url('somestring')
+    False
+    >>> string_is_url('https://some.domain.org/path')
+    True
+    """
+    parsed = urlparse.urlparse(test_str)
+    return parsed.scheme is not None and parsed.scheme != ''
