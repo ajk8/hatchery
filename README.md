@@ -109,7 +109,7 @@ Parameter | Default value | Usage
 `create_wheel` | `True` | Create a wheel along with the source distribution during the packaging step
 `git_remote_name` | `'origin'` | The name of the remote to push to when pushing a git tag
 `pypi_repository` | `None` | String parameter describing which pypi index server to upload packages to. It actually refers to an alias which must be defined in your [pypirc file](https://docs.python.org/3.5/distutils/packageindex.html#the-pypirc-file)
-`readme_to_rst` | `True` | Convert a README.md file to README.rst on the fly if the former is detected and the latter is not
+`readme_to_rst` | `True` | Convert a README.md file to README.rst on the fly if the former is detected and the latter is not. This feature requires `pandoc` (OS-level dependency) ... so if you do not want to depend on `pandoc`, set to `False` and this feature won't be used.
 `test_command` | `None` | A list of arbitrary shell commands that should be run during the test task. If any of them fails, the test will be considered a failure.
 
 These parameters should be defined in [yaml format](https://en.wikipedia.org/wiki/YAML) in the
