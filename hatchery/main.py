@@ -229,6 +229,18 @@ def task_upload(args):
     ))
 
 
+def _create_packages(create_wheel, suppress_output):
+    with workdir.as_cwd():
+        setup_args = ['sdist']
+        if create_wheel:
+            setup_args.append('bdist_wheel')
+        result = executor.setup(setup_args, suppress_output=suppress_output)
+        if result.exitval:
+            _log_failure_and_die(
+                'failed to package project', result, log_full_result=suppress_output
+            )
+
+
 def task_register(args):
     release_version = args['--release-version']
     suppress_output = not args['--stream-command-output']
@@ -242,15 +254,20 @@ def task_register(args):
         pypi_verify_ssl = config_dict['pypi_verify_ssl']
         project_name = project.get_project_name()
         package_name = _get_package_name_or_die()
-        if not release_version:
-            release_version = project.get_version(package_name)
-            if not project.version_is_valid(release_version):
-                logger.info('using version 0.0 for registration purposes')
-                release_version = '0.0'
-        _check_and_set_version(
-            release_version, package_name, project_name, pypi_repository, pypi_verify_ssl
-        )
-        result = _call_twine(['register'], pypi_repository, suppress_output)
+        packaged_files = project.get_packaged_files(package_name)
+        if len(packaged_files) == 0:
+            if not release_version:
+                release_version = project.get_version(package_name)
+                if not project.version_is_valid(release_version):
+                    logger.info('using version 0.0 for registration purposes')
+                    release_version = '0.0'
+            _check_and_set_version(
+                release_version, package_name, project_name, pypi_repository, pypi_verify_ssl
+            )
+            _create_packages(create_wheel=False, suppress_output=suppress_output)
+            packaged_files = project.get_packaged_files(package_name)
+        package_path = packaged_files[0]
+        result = _call_twine(['register', package_path], pypi_repository, suppress_output)
         if result.exitval or '(400)' in result.stdout:
             _log_failure_and_die(
                 'failed to register project', result, log_full_result=suppress_output
@@ -284,14 +301,7 @@ def task_package(args):
                         raise SystemExit(1)
                     else:
                         logger.info(e)
-        setup_args = ['sdist']
-        if config_dict['create_wheel']:
-            setup_args.append('bdist_wheel')
-        result = executor.setup(setup_args, suppress_output=suppress_output)
-        if result.exitval:
-            _log_failure_and_die(
-                'failed to package project', result, log_full_result=suppress_output
-            )
+        _create_packages(config_dict['create_wheel'], suppress_output)
     logger.info('successfully packaged {}=={}'.format(project_name, release_version))
 
 

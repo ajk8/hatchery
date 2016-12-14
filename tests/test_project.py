@@ -241,6 +241,16 @@ def test_convert_readme_to_rst(tmpdir):
                 project.convert_readme_to_rst()
 
 
+def test_get_packaged_files(tmpdir):
+    with tmpdir.as_cwd():
+        assert project.get_packaged_files('package') == []
+        os.mkdir('dist')
+        open(os.path.join('dist', 'package-ver.s.ion+1.tar.gz'), 'w').close()
+        assert project.get_packaged_files('package') == ['dist/package-ver.s.ion+1.tar.gz']
+        open(os.path.join('dist', 'package-ver.s.ion+2.tar.gz'), 'w').close()
+        assert len(project.get_packaged_files('package')) == 2
+
+
 def test_multiple_packaged_versions(tmpdir):
     with tmpdir.as_cwd():
         os.mkdir('dist')

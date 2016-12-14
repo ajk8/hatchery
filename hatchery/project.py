@@ -230,6 +230,13 @@ def convert_readme_to_rst():
     raise ProjectError('could not find any README.md file to convert')
 
 
+def get_packaged_files(package_name):
+    """ Collect relative paths to all files which have already been packaged """
+    if not os.path.isdir('dist'):
+        return []
+    return [os.path.join('dist', filename) for filename in os.listdir('dist')]
+
+
 def multiple_packaged_versions(package_name):
     """ Look through built package directory and see if there are multiple versions there """
     dist_files = os.listdir('dist')
