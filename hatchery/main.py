@@ -41,7 +41,7 @@ Notes on tagging:
 
         1. you should not use hatchery's tagging (and uploading) functionality
            until you have committed all of your changes (good practice anyway)
-        2. you must have an entry for .hatchery.work in your .gitignore file
+        2. you must have an entry for build_hatchery in your .gitignore file
            so that hatchery itself does not dirty up your working tree
 
 Config files:
@@ -77,7 +77,7 @@ from . import helpers
 
 logger = logging.getLogger(__name__)
 
-WORKDIR_DEFAULT = '.hatchery.work'
+WORKDIR_DEFAULT = 'build_hatchery'
 
 
 def _get_package_name_or_die():

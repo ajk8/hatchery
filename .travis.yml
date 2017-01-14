@@ -18,4 +18,4 @@ script:
     - hatchery clean test
 
 after_success:
-    - cd .hatchery.work; coveralls
+    - cd build_hatchery; coveralls
