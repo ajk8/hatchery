@@ -63,6 +63,8 @@ import docopt
 import logging
 import funcy
 import os
+import re
+
 import workdir
 import git
 import ruamel.yaml as yaml
@@ -74,8 +76,6 @@ from . import snippets
 from . import helpers
 
 logger = logging.getLogger(__name__)
-workdir.options.path = '.hatchery.work'
-workdir.options.sync_exclude_regex_list = [r'\.hatchery\.work']
 
 
 def _get_package_name_or_die():
@@ -418,6 +418,9 @@ def hatchery():
     if config_dict['auto_push_tag'] and 'upload' in task_list:
         logger.info('adding task: tag (auto_push_tag==True)')
         task_list.append('tag')
+
+    workdir.options.path = '.hatchery.work'
+    workdir.options.sync_exclude_regex_list = [re.escape(workdir.options.path)]
 
     # all commands will raise a SystemExit if they fail
     # check will have already been run
