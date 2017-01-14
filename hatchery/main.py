@@ -87,7 +87,10 @@ def _get_package_name_or_die():
     return package_name
 
 
-def _get_config_or_die(required_params=[], calling_task=None):
+def _get_config_or_die(required_params=None, calling_task=None):
+    if required_params is None:
+        required_params = []
+
     try:
         config_dict = config.from_yaml()
         for key in required_params:
