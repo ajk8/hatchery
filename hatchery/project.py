@@ -5,8 +5,13 @@ import logging
 import microcache
 import pypandoc
 import funcy
-from pkg_resources.extern import packaging
 from . import helpers
+
+# packaging got moved into its own top-level package in recent python versions
+try:
+    from pkg_resources.extern import packaging
+except ImportError:
+    import packaging
 
 logger = logging.getLogger(__name__)
 logging.getLogger('requests').setLevel(logging.ERROR)
