@@ -24,7 +24,7 @@ setup(
         'funcy>=1.4',
         'docopt>=0.6.2',
         'wheel>=0.26.0',
-        'ruamel.yaml>=0.11.3',
+        'ruamel.yaml>=0.11.3,<0.15',
         'pypandoc>=1.1.3',
         'twine>=1.6.5',
         'microcache>=0.2',
